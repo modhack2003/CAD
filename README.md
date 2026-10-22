@@ -10,7 +10,7 @@ A static, browser-local Three.js architectural explorer built from the supplied 
 - Adjustable floor height, material/clay/wireframe views, daylight/evening lighting.
 - Touch look controls and directional walking buttons; desktop WASD; use floor selector to change storeys.
 - Two-point floor measurements, PNG snapshot, SVG plan, OBJ geometry and JSON specification exports.
-- Source drawing and transcription/assumptions review.
+- Local-only reference drawing picker and transcription/assumptions review.
 - Local vendor modules; no third-party runtime network calls or account data access.
 - WebGL-unavailable browsers receive a working 2D plan and model exports.
 
@@ -60,3 +60,8 @@ Run the geometry regression check with `node tests/geometry.mjs`. It verifies th
 The repository includes `vercel.json`: static output is `dist/`, and the build runs the geometry regression checks. There are no runtime dependencies, API keys or environment variables to configure.
 
 The Vercel project is connected to this GitHub repository. Pushes to `main` deploy production; other branches receive preview deployments according to the project's Git settings. Keep the checked-in `dist/vendor` modules and their license with the app.
+
+
+## Reference drawing privacy
+
+The original plan photograph is not included in this public repository or the deployment. Use **Source & assumptions → Open your reference drawing** to load it locally. The browser displays it using a local object URL; no upload request is sent, and it is cleared on reload.

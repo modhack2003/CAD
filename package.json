@@ -1,0 +1,13 @@
+{
+  "name": "plan-atlas-cad",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Two-floor architectural explorer reconstructed from drawing 218129",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "node tests/geometry.mjs",
+    "build": "npm test"
+  },
+  "engines": { "node": ">=22" }
+}
