@@ -7,12 +7,13 @@ const root=fileURLToPath(new URL('../dist/',import.meta.url));
 const temp=await fs.mkdtemp(path.join(tmpdir(),'plan-atlas-test-'));
 const testModule=path.join(temp,'model-under-test.mjs');
 const elements=new Map();
-function el(id=''){return {id,style:{},dataset:{},children:[],clientWidth:1100,clientHeight:850,classList:{add(){},remove(){},toggle(){}},append(x){this.children.push(x)},appendChild(x){this.children.push(x)},remove(){},click(){},addEventListener(){},getRootNode(){return {addEventListener(){}}},getContext(type){return type==='2d'?{fillRect(){},strokeRect(){}}:null},setAttribute(){}}}
-globalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,el(id));return elements.get(id)},createElement:el,querySelectorAll(){return []},querySelector(){return null},body:el()};
-globalThis.window={addEventListener(){}};globalThis.devicePixelRatio=1;globalThis.requestAnimationFrame=()=>{};globalThis.ResizeObserver=class{observe(){}};
+function el(id=''){return {id,style:{},dataset:{},children:[],clientWidth:1100,clientHeight:850,classList:{add(){},remove(){},toggle(){}},append(x){this.children.push(x)},appendChild(x){this.children.push(x)},remove(){},focus(){},removeAttribute(){},querySelectorAll(){return []},click(){},addEventListener(){},getRootNode(){return {addEventListener(){}}},getContext(type){return type==='2d'?{fillRect(){},strokeRect(){}}:null},setAttribute(){}}}
+globalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,el(id));return elements.get(id)},createElement:el,querySelectorAll(){return []},querySelector(){return el()},addEventListener(){},body:el()};
+globalThis.window={addEventListener(){},matchMedia(){return {matches:false,addEventListener(){}}}};globalThis.devicePixelRatio=1;globalThis.requestAnimationFrame=()=>{};globalThis.ResizeObserver=class{observe(){}};
 const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'};URL.revokeObjectURL=()=>{};
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){} }`);
+source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`);
 source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
