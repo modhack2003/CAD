@@ -13,7 +13,7 @@ globalThis.window={addEventListener(){}};globalThis.devicePixelRatio=1;globalThi
 const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'};URL.revokeObjectURL=()=>{};
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){} }`);
-source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab};';
+source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
 assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
@@ -50,4 +50,10 @@ console.log('Regression checks passed: supported upper gate, shared cutaway, ass
 
 assert.ok(!m.floors[1].getObjectByName('Front stair upper flight'),'no unsupported roof-bound stair');console.log('Roof access regression: no unrequested second stair flight.');
 
+// Glazing blocks walking, and the decorative canopy is supported from the terrace.
+for(const height of [2.8,4.5]){m.state.height=height;m.build();m.model.updateMatrixWorld(true);for(const floor of m.floors){const glass=floor.getObjectByName('Tall banquet glazing');assert.ok(glass);assert.ok(new THREE.Box3().setFromObject(glass).getSize(new THREE.Vector3()).y>2,'tall glass fits even minimum storey');}assert.ok(!m.canWalk(.1,5.5));assert.ok(!m.canWalk(1,13.951),'front glazing blocks walk-through');}
+m.state.height=3.3;m.build();m.model.updateMatrixWorld(true);m.site.updateMatrixWorld(true);
+const canopy=m.floors[0].getObjectByName('Entrance canopy');const support=m.floors[0].getObjectByName('Canopy support');assert.ok(canopy&&support);const supportBounds=new THREE.Box3().setFromObject(support);assert.ok(Math.abs(supportBounds.min.y)<1e-6);assert.ok(supportBounds.max.y>=new THREE.Box3().setFromObject(canopy).min.y,'column reaches canopy');
+console.log('Banquet checks passed: glazing at height limits, glass collision, supported canopy.');
+if(process.env.CAD_GEOMETRY_OUTPUT){const meshes=[];for(const group of [m.model,m.site])group.traverse(o=>{if(!o.isMesh)return;let p=o;while(p){if(!p.visible)return;p=p.parent}const pos=o.geometry.attributes.position;const vertices=[];const point=new THREE.Vector3();for(let i=0;i<pos.count;i++){point.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);vertices.push(point.toArray())}meshes.push({name:o.name,vertices,indices:o.geometry.index?Array.from(o.geometry.index.array):Array.from({length:pos.count},(_,i)=>i),color:o.material.color.getHexString()})});await fs.writeFile(process.env.CAD_GEOMETRY_OUTPUT,JSON.stringify(meshes));}
 await fs.rm(temp,{recursive:true,force:true});

@@ -65,3 +65,7 @@ The Vercel project is connected to this GitHub repository. Pushes to `main` depl
 ## Reference drawing privacy
 
 The original plan photograph is not included in this public repository or the deployment. Use **Source & assumptions → Open your reference drawing** to load it locally. The browser displays it using a local object URL; no upload request is sent, and it is cleared on reload.
+
+## Banquet exterior design
+
+The exterior now opens with tall glazed bays, warm ivory cladding, bronze accents and vertical fins, a column-supported entrance canopy, and a proposed garden with trees, flowering borders, seating and bollards. Select **Evening** under appearance to illuminate the facade and entrance. The floor plan and supported first-floor landing entry are retained. Landscaping is illustrative; site boundaries and setbacks have not been surveyed.
