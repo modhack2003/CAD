@@ -35,6 +35,8 @@ Compared the supplied photographs of drawing 218129 (Plan A) and 218124 (Plan B)
 | 27 | Plan A room areas looked more exact than the source justified. | Mark label products as nominal, distinguish Room A's stepped geometry, and correct nominal hall rounding. |
 | 28 | Stair risk was hidden in general assumptions. | Show live rise/tread/upper-landing values beside the controls and include them in the JSON specification. |
 
+| 29 | Landscape phone plan view spent too much height on the camera toolbar. | Move its three plan controls to the side and expand the drawing viewport; widen the narrow-phone plan selector. |
+
 ## Drawing questions and remaining design work
 
 These cannot be resolved faithfully from the two photographs alone. They are documented, not silently invented.
@@ -56,3 +58,5 @@ These cannot be resolved faithfully from the two photographs alone. They are doc
 `npm test` covers both models, printed clear room/bay dimensions, floor/entry support, stair openings, height limits, canopy/paving support, OBJ face indices, safe room targets, collisions, plan switching, image isolation, resource disposal, drawer focus and SVG navigation gestures. Both generated SVG files were also parsed with an XML parser during the audit.
 
 The review browser disables WebGL. Software depth-buffer images were used to inspect ground-floor geometry, but are not evidence of the browser's lighting, transparency, clipping or GPU performance. Live WebGL and physical-phone verification remain outstanding.
+
+Preview browser checks passed at 320 × 568, 390 × 844 and 844 × 390 for overflow, plan zoom/Fit, first-floor selection, modal source readings and drawer dismissal. `tests/responsive.html` retains the repeatable iframe fixture; temporarily serve it beside `index.html` for manual review. It is excluded from the deployed app.
