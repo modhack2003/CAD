@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Plan Atlas">
+<rect width="64" height="64" rx="12" fill="#172b2d"/>
+<g fill="none" stroke="#d7e8b1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 50V26l20-13 20 13v24"/>
+<path d="M12 50h40"/>
+<path d="M26 50V38h12v12"/>
+</g>
+</svg>
