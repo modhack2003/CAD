@@ -94,6 +94,7 @@ const walls=m.floors[0];
 const bound=name=>new THREE.Box3().setFromObject(walls.getObjectByName('Plan B '+name).children[0]);
 const left=bound('service exterior').max.x,rear=bound('rear exterior').max.z;
 assert.ok(Math.abs(bound('Rear-left room divider').min.x-left-2.4384)<1e-5,'rear room clear width is 8 ft');assert.ok(Math.abs(bound('Rear-left room front').min.z-rear-3.6576)<1e-5,'rear room clear depth is 12 ft');
+assert.ok(Math.abs(bound('Toilet centre divider').min.x-left-1.2192)<1e-5,'left WC clear width');assert.ok(Math.abs(bound('Toilet service screen').min.x-bound('Toilet centre divider').max.x-1.2192)<1e-5,'right WC clear width');assert.ok(Math.abs(bound('Toilet upper division').min.z-bound('Rear-left room front').max.z-1.8288)<1e-5,'upper WC clear depth');assert.ok(Math.abs(bound('Toilet service front').min.z-bound('Toilet upper division').max.z-1.8288)<1e-5,'lower WC clear depth');
 assert.ok(Math.abs(bound('Front room divider').min.x-left-6)<1e-5,'front room clear width is 6 m');
 assert.ok(Math.abs(bound('front room facade').min.z-bound('Front room partitions').max.z-2.45)<1e-5,'front room clear depth is 2.45 m');
 assert.ok(m.stairReview().front.upperLandingClear>=.95,'upper exit has a usable conceptual landing');
