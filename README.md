@@ -69,3 +69,9 @@ The original plan photograph is not included in this public repository or the de
 ## Banquet exterior design
 
 The exterior now opens with tall glazed bays, warm ivory cladding, bronze accents and vertical fins, a column-supported entrance canopy, and a proposed garden with trees, flowering borders, seating and bollards. Select **Evening** under appearance to illuminate the facade and entrance. The floor plan and supported first-floor landing entry are retained. Landscaping is illustrative; site boundaries and setbacks have not been surveyed.
+
+## Mobile controls
+
+On a phone, open the menu for floors, rooms, layers and appearance. Camera shortcuts sit in a scrollable bottom toolbar. Drag to orbit and pinch to zoom; in Walk inside, drag to look and hold the arrow buttons to move. The controls adapt to portrait, landscape and display cutouts. The drawer closes with its close button, the backdrop or Escape.
+
+The test command includes portrait camera framing and drawer keyboard/focus checks alongside the building geometry regressions. The mobile layout was reviewed at 320 × 568, 390 × 844 and 844 × 390, including floor switching, the controls drawer and source/export dialogs. The review browser has WebGL disabled, so live 3D rendering and physical-device touch gestures still need a device check.
