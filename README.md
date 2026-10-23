@@ -1,4 +1,4 @@
-# Plan Atlas — drawing 218129
+# Plan Atlas — Plan A and Plan B
 
 A static, browser-local Three.js architectural explorer built from the supplied photograph.
 
@@ -83,3 +83,11 @@ Use the **Building plan** selector in the header to switch alternatives. `?plan=
 Plan B uses the printed 16.740 × 13.951 m main block. It has an 8′ × 12′ rear-left room, three 4′ × 6′ toilet compartments, separate urinal and hand-wash areas, two front rooms with unspecified uses, and one front stair. The left front room is labeled 6.000 × 2.450 m. The other room width and door positions are inferred.
 
 The front projection dimensions conflict: 4.600 m on the right versus approximately 3.773 m on the left. Plan B provisionally uses 4.600 m, clearly marked in the source review, SVG and JSON. As with Plan A, the first floor is an assumed repeat because only one floor drawing was supplied. A net hall area is not asserted for Plan B.
+
+## Two-plan audit
+
+See [the full findings register](docs/PLAN_AUDIT.md) for corrections, drawing uncertainties and remaining design work. Plan B now follows the printed column bay chains and clear dimensions of the rear room, three WCs and front-left room. Its 128 mm exterior-wall annotation is treated provisionally.
+
+The floor-plan view supports drag to pan, pinch/wheel or +/− to zoom, and Fit to reset. Keyboard users can focus the plan and use arrows, +/− and Home. Zoom stays available without WebGL. SVG exports identify the selected floor and include doors and glazing. 3D-only controls are disabled while viewing the annotated plan.
+
+The stair readout shows modeled rise, tread and exit landing at the current height. It does not establish stair suitability or regulatory compliance. Movement stays on the selected floor; stairs, open doors and visible furniture block the walkthrough. Use Ground/First to change storeys.
