@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { responsiveFov, setupDrawer } from './mobile-ui.js';
-import {plans,planAGrid,planColumns,planShell,planFixtures,planLabels,planRails,planSheet,planSheetNotes,stairMetrics,TARGET_GOING,PLAN_VIEWBOX} from './plans.js';
+import {plans,planColumns,planShell,planFixtures,planLabels,planRails,planSheet,planSheetNotes,stairMetrics,flightRisers,goingBand,LANDING,TARGET_GOING,PLAN_VIEWBOX} from './plans.js';
 
 const $=id=>document.getElementById(id);
 const touchDevice=window.matchMedia('(pointer:coarse)').matches;
@@ -27,7 +27,7 @@ const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;cont
 // Render on demand. A static view costs no GPU work, which matters most on phones.
 let needsRender=true,labelsDirty=true;
 function invalidate(){needsRender=true;labelsDirty=true}
-controls.addEventListener('change',invalidate);
+controls.addEventListener('change',invalidate);controls.addEventListener('start',()=>releaseFit());
 scene.add(new THREE.HemisphereLight(0xf8fcf0,0x8b9a82,2.3));const sun=new THREE.DirectionalLight(0xfff6dc,3.1);sun.position.set(-8,27,16);sun.castShadow=true;sun.shadow.mapSize.set(touchDevice?1024:2048,touchDevice?1024:2048);Object.assign(sun.shadow.camera,{left:-25,right:25,top:25,bottom:-25,near:1,far:90});sun.shadow.normalBias=.035;sun.shadow.bias=-.00015;sun.target.position.set(8,0,7);scene.add(sun,sun.target);
 const fill=new THREE.DirectionalLight(0xdbeeff,1.25);fill.position.set(24,12,-16);scene.add(fill);
 // A banquet hall is sold on its lighting, so the interior has its own fittings
@@ -58,10 +58,10 @@ function stairWaist(g,name,c,start,end,y0,y1,width,alongX=false){
 // Riser count follows the storey height so the slider can never exceed a 190 mm rise.
 // Where the drawn well is too shallow for a usable going the treads are tinted as
 // diagrammatic rather than quietly presented as buildable.
-function treadMaterial(going){return going<TARGET_GOING?mats.diagram:mats.stone}
-function stairs(g,x,z,w,depth,h,name){const sm=stairMetrics(depth,h),n=sm.perFlight,run=sm.going,tm=treadMaterial(run);for(let i=0;i<n;i++){box(g,name+' lower flight',x+w*.25,(i+1)*h/4/n,z+depth-(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm);box(g,name+' upper flight',x+w*.75,h/2+(i+1)*h/4/n,z+.88+(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm)}stairWaist(g,name+' upper waist',x+w*.75,z+.88,z+depth,h/2,h,w*.49);box(g,name+' mid landing',x+w/2,h/2-.09,z+.44,w,.18,.88,mats.stone);rail(g,x+.04,z+depth,x+.04,z+.88,0,h/2);rail(g,x+w-.04,z+.88,x+w-.04,z+depth,h/2,h);rail(g,x+.04,z+.05,x+w-.04,z+.05,h/2,h/2)}
+function treadMaterial(going){return goingBand(going)==='meets'?mats.stone:mats.diagram}
+function stairs(g,x,z,w,depth,h,name){const sm=stairMetrics(depth,h),n=sm.perFlight,run=sm.going,tm=treadMaterial(run);for(let i=0;i<n;i++){box(g,name+' lower flight',x+w*.25,(i+1)*h/4/n,z+depth-(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm);box(g,name+' upper flight',x+w*.75,h/2+(i+1)*h/4/n,z+LANDING+(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm)}stairWaist(g,name+' upper waist',x+w*.75,z+LANDING,z+depth,h/2,h,w*.49);box(g,name+' mid landing',x+w/2,h/2-.09,z+LANDING/2,w,.18,LANDING,mats.stone);rail(g,x+.04,z+depth,x+.04,z+LANDING,0,h/2);rail(g,x+w-.04,z+LANDING,x+w-.04,z+depth,h/2,h);rail(g,x+.04,z+.05,x+w-.04,z+.05,h/2,h/2)}
 
-function rearStairs(g,h){const sm=stairMetrics(2.73,h),n=sm.perFlight,tm=treadMaterial(1.85/n);for(let i=0;i<n;i++){box(g,'Rear L stair lower flight',12.275,(i+1)*h/4/n,3.35-(i+.5)*1.85/n,1.25,(i+1)*h/2/n,1.85/n,tm);box(g,'Rear L stair upper flight',12.9+(i+.5)*2.3/n,h/2+(i+1)*h/4/n,.875,2.3/n,(i+1)*h/2/n,1.25,tm)}stairWaist(g,'Rear upper waist',.875,12.9,15.2,h/2,h,1.25,true);box(g,'Rear quarter-turn landing',12.275,h/2-.09,.875,1.25,.18,1.25,mats.stone);rail(g,11.7,3.35,11.7,1.5,0,h/2);rail(g,11.7,.3,12.9,.3,h/2,h/2);rail(g,12.9,.3,15.2,.3,h/2,h)}
+function rearStairs(g,h){const n=flightRisers(h),tm=treadMaterial(1.85/n);for(let i=0;i<n;i++){box(g,'Rear L stair lower flight',12.275,(i+1)*h/4/n,3.35-(i+.5)*1.85/n,1.25,(i+1)*h/2/n,1.85/n,tm);box(g,'Rear L stair upper flight',12.9+(i+.5)*2.3/n,h/2+(i+1)*h/4/n,.875,2.3/n,(i+1)*h/2/n,1.25,tm)}stairWaist(g,'Rear upper waist',.875,12.9,15.2,h/2,h,1.25,true);box(g,'Rear quarter-turn landing',12.275,h/2-.09,.875,1.25,.18,1.25,mats.stone);rail(g,11.7,3.35,11.7,1.5,0,h/2);rail(g,11.7,.3,12.9,.3,h/2,h/2);rail(g,12.9,.3,15.2,.3,h/2,h)}
 function deskSet(f,x,z){box(f,'Room desk',x,.75,z,1.5,.09,.7,mats.wood,'furniture');for(const dx of [-.65,.65])box(f,'Desk leg',x+dx,.36,z,.06,.72,.5,mats.metal,'furniture');box(f,'Chair seat',x,.48,z+.65,.48,.1,.48,mats.seat,'furniture');box(f,'Chair back',x,.78,z+.87,.48,.55,.06,mats.seat,'furniture');for(const dx of [-.18,.18])for(const dz of [-.18,.18])box(f,'Chair leg',x+dx,.215,z+.65+dz,.045,.43,.045,mats.metal,'furniture')}
 function benches(f,xs,zs){for(const z of zs)for(const x of xs){box(f,'Hall bench',x,.46,z,1.8,.11,.5,mats.wood,'furniture');for(const dx of [-.65,.65])box(f,'Bench support',x+dx,.22,z,.09,.44,.4,mats.metal,'furniture')}}
 function diningTable(f,x,z){box(f,'Round table top',x,.74,z,1.3,.07,1.3,mats.wood,'furniture');box(f,'Table pedestal',x,.37,z,.22,.68,.22,mats.metal,'furniture');for(const [dx,dz] of [[-.85,0],[.85,0],[0,-.85],[0,.85]]){box(f,'Dining chair seat',x+dx,.45,z+dz,.45,.1,.45,mats.seat,'furniture');box(f,'Dining chair back',x+dx*1.26,.75,z+dz*1.26,dz?.45:.06,.5,dz?.06:.45,mats.seat,'furniture')}}
@@ -99,7 +99,7 @@ function banquetFacade(g,level,h){
 function fillList(id,items){const el=$(id);el.textContent='';for(const text of items){const li=document.createElement('li');li.textContent=text;el.append(li)}}
 function fillRows(id,rows){const el=$(id);el.textContent='';for(const [k,v] of rows){const tr=document.createElement('tr');for(const value of [k,v]){const td=document.createElement('td');td.textContent=value;tr.append(td)}el.append(tr)}}
 function stairReview(){const st=plan.stair,sm=stairMetrics(st.depth,state.height);
- return {front:{risers:sm.risers,rise:sm.rise,tread:sm.going,wellDepth:st.depth,requiredWellDepth:sm.requiredDepth,shortfall:sm.shortfall,verdict:sm.verdict,upperLandingClear:D+E-T/2-(st.z+st.depth)},
+ return {front:{risers:sm.risers,rise:sm.rise,tread:sm.going,wellDepth:st.depth,requiredWellDepth:sm.requiredDepth,shortfall:sm.shortfall,band:sm.band,verdict:sm.verdict,upperLandingClear:D+E-T/2-(st.z+st.depth)},
   rear:plan.rearStair?{risers:sm.risers,rise:sm.rise,lowerTread:1.85/sm.perFlight,upperTread:2.3/sm.perFlight}:null,
   status:'Concept only. Risers are capped at 190 mm by raising the riser count; the going is limited by the drawn well depth and cannot be fixed without redesign. Verify treads, risers, headroom, handrails, accessibility and evacuation with an architect.'}}
 function refreshPlanUI(){
@@ -131,8 +131,10 @@ function switchPlan(id,persist=true){
 
 function build(){cutMaterials.forEach(m=>m.dispose());cutMaterials=[];model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.isLine)o.material.dispose()});model.clear();floors=[];colliders=[];openingsDrawn=[];furnitureObstacles=[];modelObjects=[];labelDefs.forEach(l=>l.el.remove());labelDefs=[];const h=state.height-SLAB;
 for(let level=0;level<2;level++){const g=new THREE.Group();g.name=level?'First floor (assumed repeat)':'Ground floor';g.userData.level=level;model.add(g);floors.push(g);slab(g,0,level===1);
-// One renderer, driven by the plan descriptors in plans.js, so an alternative
-// is a data entry instead of a second code path.
+// One renderer, driven by the plan descriptors in plans.js. Walls, fixtures,
+// labels, guards, columns and the 2D sheet are all data. The rear quarter-turn
+// stair is the remaining exception: its geometry is still written in code here,
+// in stairSurface(), in the slab hole and in the DXF writer.
 for(const [name,axis,a,b,c,openings,outer,cut] of planShell(plan,level))wall(g,name,axis,a,b,c,h,openings,outer,cut);
 for(const [x,z] of columnPoints())box(g,'Column',x,h/2,z,columnSize(),h,columnSize(),mats.stone);
 for(const x of [EX+.11,12.72,W-.11])box(g,'Entrance column',x,h/2,D+E-.11,.28,h,.28,mats.stone);
@@ -155,7 +157,7 @@ label(dimGroup,W.toFixed(3)+' m overall width',W/2,.08,-1.05,'dim','',3);
 dim([[-1,.04,0],[-1,.04,D]]);for(const z of [0,D])dim([[-.75,.04,z],[-1.25,.04,z]]);
 label(dimGroup,D.toFixed(3)+' m block depth',-1.1,.08,D/2,'dim','',3);
 dim([[W+1,.04,D],[W+1,.04,D+E]]);for(const z of [D,D+E])dim([[W+.75,.04,z],[W+1.25,.04,z]]);
-label(dimGroup,E.toFixed(4)+' m projection'+(plan.projectionProvisional?' *':''),W+1.35,.08,D+E/2,'dim','',3);
+label(dimGroup,trimNum(E)+' m projection'+(plan.projectionProvisional?' *':''),W+1.35,.08,D+E/2,'dim','',3);
 const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
 for(let i=0;i<bays.length-1;i++){dim([[bays[i],.04,-2],[bays[i+1],.04,-2]]);for(const x of [bays[i],bays[i+1]])dim([[x,.04,-1.8],[x,.04,-2.2]]);label(dimGroup,(bays[i+1]-bays[i]).toFixed(3),(bays[i]+bays[i+1])/2,.08,-2.05,'dim','',4)}
 buildSite();update();}
@@ -183,16 +185,19 @@ for(const [x,z] of [[plan.entryCenter-1.4,D+E+.8],[plan.entryCenter+1.5,D+E+.8],
 }
 const grid=new THREE.GridHelper(50,50,0x9aa58f,0xc3ccba);grid.position.set(W/2,.018,8.8);scene.add(grid);
 const measureGroup=new THREE.Group();scene.add(measureGroup);
-let measureActive=false,measurePoints=[],walkYaw=0,walkPitch=0,walkY=0,drag=null,lastTime=performance.now();const keys=new Set();
+let measureActive=false,measurePoints=[],measureMarks=[],walkYaw=0,walkPitch=0,walkY=0,drag=null,lastTime=performance.now();const keys=new Set();
 const drawer=setupDrawer({onPause:()=>{keys.clear();drag=null;controls.autoRotate=false;$('rotate').classList.remove('active')}});
 function update(){$('main').dataset.mode=state.mode;$('labelLayer').hidden=state.mode==='plan'||state.mode==='walk';site.visible=state.mode!=='plan'&&state.floor!=='1';
 // Style/cutaway sync happens in one traversal per storey, not two.
 materials.forEach(m=>{m.wireframe=state.style==='wire';m.color.copy(state.style==='clay'?new THREE.Color(0xf1f0e9):m.userData.base);m.map=m===mats.floor&&state.style==='material'?floorTexture:null;m.needsUpdate=true});
 floors.forEach((g,i)=>{g.position.y=i*(state.height+explodedOffset());g.userData.cutPlane.constant=g.position.y+1.15;g.visible=state.mode==='walk'||state.floor==='both'||state.floor===String(i);g.userData.fixtures.visible=state.furniture;g.traverse(o=>{if(o.isMesh&&o.userData.fullMaterial){o.visible=true;const original=o.userData.fullMaterial,variant=o.userData.cutMaterial;variant.color.copy(original.color);variant.map=original.map;variant.wireframe=original.wireframe;variant.needsUpdate=true;o.material=state.mode==='cutaway'?variant:original;}})});
 dimGroup.visible=state.dimensions&&state.mode!=='plan'&&state.mode!=='walk';
-const lit=state.light==='evening'?17:state.mode==='walk'?6:0,litY=(state.floor==='1'?state.height+explodedOffset():0)+state.height-.45;
-hallLightPoints().forEach(([x,z],i)=>{interiorLights[i].position.set(x,litY,z);interiorLights[i].intensity=state.mode==='plan'?0:lit});
-roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&(state.mode==='walk'||state.floor!=='0')&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='Front stair: '+Math.round(sr.rise*1000)+' mm rise / '+Math.round(sr.tread*1000)+' mm going · '+sr.upperLandingClear.toFixed(2)+' m upper landing. '+(sr.shortfall>.01?'Well is '+sr.shortfall.toFixed(2)+' m too shallow for a '+Math.round(TARGET_GOING*1000)+' mm going — treads shown in amber are diagrammatic.':'Meets the '+Math.round(TARGET_GOING*1000)+' mm going target; headroom and width still need review.');$('stairReview').classList.toggle('warn',sr.shortfall>.01);$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
+const lit=state.light==='evening'?17:state.mode==='walk'?6:0;
+const upperY=state.height+explodedOffset(),baseY=state.floor==='1'?upperY:0,spread=state.floor==='both',points=hallLightPoints();
+interiorLights.forEach((l,i)=>{const point=points[i];
+ if(!point||state.mode==='plan'){l.intensity=0;return}
+ l.position.set(point[0],(spread&&i%2?upperY:baseY)+state.height-.45,point[1]);l.intensity=lit});
+roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&(state.mode==='walk'||state.floor!=='0')&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='Front stair: '+Math.round(sr.rise*1000)+' mm rise / '+Math.round(sr.tread*1000)+' mm going · '+sr.upperLandingClear.toFixed(2)+' m upper landing. '+({meets:'Meets the '+Math.round(TARGET_GOING*1000)+' mm going target; headroom and width still need review.',marginal:'Going is marginally under the '+Math.round(TARGET_GOING*1000)+' mm target — the well is '+sr.shortfall.toFixed(2)+' m short. Treads are tinted as unverified.',diagrammatic:'Well is '+sr.shortfall.toFixed(2)+' m too shallow for a '+Math.round(TARGET_GOING*1000)+' mm going — amber treads are diagrammatic.'}[sr.band]);$('stairReview').classList.toggle('warn',sr.band!=='meets');$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
 // Room labels only read inside the cutaway, so the toggle says so instead of doing nothing.
 $('labels').disabled=state.mode!=='cutaway';$('dimensions').disabled=state.mode==='plan'||state.mode==='walk';
 for(const id of ['bird','top','front','rotate'])$(id).disabled=!webglAvailable;document.querySelectorAll('[data-mode]').forEach(b=>{b.disabled=!webglAvailable&&b.dataset.mode!=='plan';b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode))});document.querySelectorAll('[data-floor]').forEach(b=>{b.disabled=state.mode==='plan'&&b.dataset.floor==='both';b.setAttribute('aria-pressed',String(b.dataset.floor===state.floor))});$('viewChip').innerHTML='<i></i>'+(!webglAvailable?'2D · NO WEBGL':({walk:'INTERIOR',plan:'2D PLAN',cutaway:explodedOffset()>0?'EXPLODED VIEW':state.floor==='both'?'ASSEMBLED 3D':'ISOLATED FLOOR',exterior:'ASSEMBLED 3D'}[state.mode]));$('viewTitle').textContent={cutaway:'A new perspective.',exterior:'Outside, all around.',walk:'Step into the space.',plan:'Every line has a place.'}[state.mode];$('interactionHint').textContent=!webglAvailable?'2D fallback · drag to pan · pinch / + − to zoom':state.mode==='walk'?(touchDevice?'Drag to look · Hold arrows to walk':'Drag to look · WASD to move'):state.mode==='plan'?'Drag to pan · pinch / scroll / + − to zoom · Fit to reset':(touchDevice?'Drag to orbit · Pinch to zoom':'Drag to orbit · Scroll to zoom · Right-drag to pan');document.querySelector('.walk-hint').textContent=touchDevice?'Drag to look · Hold arrows to walk · the stairs carry you between floors':'Drag to look · WASD / arrows to move · Q and E turn · walk up the stairs to change floor';$('compass').hidden=state.mode==='walk';$('spaceCard').style.display=state.mode==='plan'?'none':'';if(state.mode==='plan')renderPlan();invalidate();syncURL();}
@@ -208,7 +213,9 @@ function frameRadius(includeSite=false){
  return fitBox.getBoundingSphere(fitSphere).radius;
 }
 function fitDistance(radius){const v=camera.fov*Math.PI/180,h=2*Math.atan(Math.tan(v/2)*Math.max(.1,camera.aspect));return radius*1.05/Math.sin(Math.max(.05,Math.min(v,h))/2)}
-let autoFit=null,fitting=false;
+let autoFit=null;
+// Any direct camera input ends the fit, so a later resize keeps the user's view.
+function releaseFit(){autoFit=null}
 function placeView({pos,target,fitRadius}){
  let p=new THREE.Vector3(...pos);
  if(fitRadius>0){const t=new THREE.Vector3(...target);p=t.clone().add(p.clone().sub(t).normalize().multiplyScalar(fitDistance(fitRadius)))}
@@ -219,10 +226,30 @@ function view(pos,target,orthographic=false,fitRadius=0){ortho.zoom=1;orthoMode=
  resize();if(!autoFit)placeView({pos,target,fitRadius:0});invalidate()}
 function bird(){if(!webglAvailable){setMode('plan');return}if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');const y=state.floor==='1'?state.height+explodedOffset():2;view([30,29,36],[W/2,y,8.1],false,frameRadius());}
 function setMode(mode){if(!webglAvailable&&mode!=='plan'){toast('3D requires WebGL. This browser can use the 2D plan and all model exports.');mode='plan'}state.mode=mode;keys.clear();clearMeasure();canvas.style.cursor='';measureActive=false;$('measure').classList.remove('active');$('measureInfo').hidden=true;controls.autoRotate=false;$('rotate').classList.remove('active');if(mode==='exterior'){state.roof=true;$('roof').checked=true;state.explode=0;$('explode').value=0;state.floor='both';state.section=100;$('section').value=100;view([31,15,39],[W/2,2.3,10],false,frameRadius(true))}if(mode==='cutaway'){state.roof=false;$('roof').checked=false;view([29,28,36],[W/2,2.5,8.4],false,frameRadius())}if(mode==='walk'){state.floor=state.floor==='1'?'1':'0';state.explode=0;$('explode').value=0;state.roof=true;$('roof').checked=true;state.section=100;$('section').value=100;walkY=floorY();view([rooms.hall.x,floorY()+1.65,rooms.hall.z],[rooms.hall.x,floorY()+1.65,3]);walkYaw=0;walkPitch=0;controls.enabled=false}if(mode==='plan'){state.floor=state.floor==='both'?'0':state.floor;controls.enabled=false}update();drawer.close()}
-function focusRoom(id){const r=rooms[id];if(!r)return;selectedRoom=id;$('spaceTitle').textContent=r.title;$('spaceDesc').textContent=r.desc;$('statOne').textContent=r.size;$('statOne').style.fontSize='11px';$('statOneLabel').textContent='PLAN READING';$('statTwo').textContent=r.area;$('statTwo').style.fontSize='11px';$('statTwoLabel').textContent=r.areaLabel||'DRAWING AREA';$('enter').textContent='Step inside ↗';$('enter').dataset.room=id;document.querySelectorAll('[data-room]').forEach(b=>b.classList.toggle('active',b.dataset.room===id));if(state.mode==='walk'){const target=safeWalkTarget(r);camera.position.set(target.x,floorY()+1.65,target.z);walkYaw=id==='hall'?0:Math.PI;walkPitch=0}else if(state.mode!=='plan'){const y=state.floor==='0'?0:state.height+explodedOffset();view([r.x+9,y+12,r.z+11],[r.x,y+1,r.z],false,6.5)}else{renderPlan(id)}drawer.close()}
-function clearMeasure(){measurePoints=[];if(measureActive)$('measureInfo').textContent='Click two points on any visible surface to measure.';measureGroup.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});measureGroup.clear()}
+function focusRoom(id){const r=rooms[id];if(!r)return;selectedRoom=id;$('spaceTitle').textContent=r.title;$('spaceDesc').textContent=r.desc;$('statOne').textContent=r.size;$('statOne').style.fontSize='11px';$('statOneLabel').textContent='PLAN READING';$('statTwo').textContent=r.area;$('statTwo').style.fontSize='11px';$('statTwoLabel').textContent=r.areaLabel||'DRAWING AREA';$('enter').textContent='Step inside ↗';$('enter').dataset.room=id;document.querySelectorAll('[data-room]').forEach(b=>b.classList.toggle('active',b.dataset.room===id));if(state.mode==='walk'){const target=safeWalkTarget(r);camera.position.set(target.x,floorY()+1.65,target.z);walkYaw=id==='hall'?0:Math.PI;walkPitch=0;invalidate()}else if(state.mode!=='plan'){const y=state.floor==='0'?0:state.height+explodedOffset();view([r.x+9,y+12,r.z+11],[r.x,y+1,r.z],false,6.5)}else{renderPlan(id)}drawer.close()}
+function clearMeasure(){measurePoints=[];measureMarks=[];if(measureActive)$('measureInfo').textContent='Click two points on any visible surface to measure.';measureGroup.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});measureGroup.clear();invalidate()}
+// Resolve a ray hit into the pair of points measurement needs. The recorded
+// point is exact -- snapped to a geometry corner within 280 mm, otherwise the
+// hit itself -- while only the marker is lifted off the face so it stays
+// visible. Offsetting the recorded point instead cost ~30 mm at each end, which
+// is a systematic error in a tool whose whole purpose is dimensional checking.
+function measureHit(hit){
+ let point=hit.point.clone(),snapped=false;
+ const position=hit.object.geometry?.attributes?.position,corner=new THREE.Vector3();
+ if(hit.face&&position){let best=.28;
+  for(const index of [hit.face.a,hit.face.b,hit.face.c]){
+   corner.fromBufferAttribute(position,index).applyMatrix4(hit.object.matrixWorld);
+   const d=corner.distanceTo(hit.point);if(d<best){best=d;point=corner.clone();snapped=true}}}
+ const shown=point.clone();
+ if(hit.face)shown.add(hit.face.normal.clone().transformDirection(hit.object.matrixWorld).multiplyScalar(.03));
+ else shown.y+=.04;
+ return {point,shown,snapped};
+}
 function formatDistance(v){if(state.units==='m')return v.toFixed(2)+' m';const total=Math.round(v/.0254);return Math.floor(total/12)+'′ '+total%12+'″'}
 function download(name,data,type){const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+const trimNum=v=>String(+v.toFixed(4));
+const svgColour=v=>/^(#[0-9a-fA-F]{3,8}|none)$/.test(v)?v:'none';
+const svgPath=d=>/^[-0-9.,\sMLHVZmlhvz]+$/.test(d)?d:'';
 const xmlText=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function svgText(x,z,s,size=.23,color='#42604a',anchor='middle'){return `<text x="${x}" y="${z}" text-anchor="${anchor}" font-size="${size}" fill="${color}" font-family="Arial,sans-serif">${xmlText(s)}</text>`}
 // Scale bar, north arrow, dimension chains and a title block, shared by both plans
@@ -234,7 +261,7 @@ function svgAnnotations(floorLabel,footnotes=[]){
  line(`M-1 0V${D}M-1.25 0h.5M-1.25 ${D}h.5`);
  a.push(`<text x="-1.32" y="${D/2}" transform="rotate(-90 -1.32 ${D/2})" text-anchor="middle" font-size=".25" fill="#5d7059" font-family="Arial,sans-serif">${D.toFixed(3)} m printed block depth</text>`);
  line(`M${W+1} ${D}V${D+E}M${W+.75} ${D}h.5M${W+.75} ${D+E}h.5`);
- a.push(`<text x="${W+1.32}" y="${D+E/2}" transform="rotate(-90 ${W+1.32} ${D+E/2})" text-anchor="middle" font-size=".24" fill="#5d7059" font-family="Arial,sans-serif">${E.toFixed(4)} m projection${plan.projectionProvisional?' *':''}</text>`);
+ a.push(`<text x="${W+1.32}" y="${D+E/2}" transform="rotate(-90 ${W+1.32} ${D+E/2})" text-anchor="middle" font-size=".24" fill="#5d7059" font-family="Arial,sans-serif">${trimNum(E)} m projection${plan.projectionProvisional?' *':''}</text>`);
  // Bay chain traced from the same column grid the 3D model uses.
  const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((x,y)=>x-y);
  for(let i=0;i<bays.length-1;i++){line(`M${bays[i]} -2H${bays[i+1]}M${bays[i]} -1.82V-2.18M${bays[i+1]} -1.82V-2.18`,.025);t((bays[i]+bays[i+1])/2,-2.26,(bays[i+1]-bays[i]).toFixed(3),.21)}
@@ -243,18 +270,19 @@ function svgAnnotations(floorLabel,footnotes=[]){
  const nx=W+1.1,nz=1.6;
  a.push(`<circle cx="${nx}" cy="${nz}" r=".82" fill="none" stroke="#8b9a86" stroke-width=".03"/>`,`<path d="M${nx} ${nz-.62}L${nx+.26} ${nz+.28}L${nx} ${nz+.08}L${nx-.26} ${nz+.28}Z" fill="#4f6853"/>`);
  t(nx,nz+.68,'UP',.2,'#5d7059');t(nx,nz+1.18,'DRAWING TOP',.18,'#8b9a86');t(nx,nz+1.44,'true north unverified',.15,'#8b9a86');
- // Graphic scale, so the sheet stays measurable at any print size or zoom.
- const sz=D+E+1.4;
+ // Graphic scale and title block sit at fixed sheet coordinates, not relative to
+ // the building, so a deeper front projection cannot push them off the sheet.
+ const sz=19.1;
  for(let i=0;i<5;i++)a.push(`<rect x="${i}" y="${sz}" width="1" height=".22" fill="${i%2?'#fafbf5':'#4f6853'}" stroke="#4f6853" stroke-width=".02"/>`);
  for(let i=0;i<=5;i++)t(i,sz-.12,String(i),.2,'#5d7059');
  t(2.5,sz+.62,'METRES · 1 : 100 at A3',.21);
- const ty=D+E+2.3;
- a.push(`<rect x="7" y="${ty}" width="${Math.max(9,W-7)}" height="2.5" fill="#f4f6ec" stroke="#4f6853" stroke-width=".04"/>`);
+ const ty=19.8;
+ a.push(`<rect x="7" y="${ty}" width="${Math.max(9,W-7)}" height="3" fill="#f4f6ec" stroke="#4f6853" stroke-width=".04"/>`);
  t(7.3,ty+.52,'PLAN ATLAS · BANQUET HALL',.32,'#2f4738','start');
  t(7.3,ty+1,'Drawing '+plan.drawing+' · '+plan.name+' · '+floorLabel,.23,'#5d7059','start');
  t(7.3,ty+1.42,'Concept reconstruction from a photograph. Not a surveyed or construction drawing.',.2,'#7d8a76','start');
  t(7.3,ty+1.82,'Dimensions in millimetres on the source; metres here. Verify on site before use.',.2,'#7d8a76','start');
- footnotes.forEach((note,i)=>t(7.3,ty+2.22+i*.3,note,.19,'#8a6a3c','start'));
+ footnotes.forEach((note,i)=>t(7.3,ty+2.2+i*.33,note,.19,'#8a6a3c','start'));
  return a.join('');
 }
 // One sheet renderer for every plan. Walls come from the collision set, columns
@@ -263,18 +291,18 @@ function svgAnnotations(floorLabel,footnotes=[]){
 function svgPlan(highlight=''){
  const upper=state.floor==='1',floor=upper?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR';
  const st=plan.stair,sm=stairMetrics(st.depth,state.height),parts=[];
- const rect=(x,z,w,d,fill,stroke='none',sw=.035)=>`<rect x="${x}" y="${z}" width="${w}" height="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+ const rect=(x,z,w,d,fill,stroke='none',sw=.035)=>`<rect x="${+x}" y="${+z}" width="${+w}" height="${+d}" fill="${svgColour(fill)}" stroke="${svgColour(stroke)}" stroke-width="${+sw}"/>`;
  parts.push(`<path d="M0 0H${W}V${D+E}H${EX}V${D}H0Z" fill="#f8f7ec" stroke="#3f5747" stroke-width=".15"/>`);
  for(const item of planSheet(plan,upper)){
   if(item[0]==='zone')parts.push(rect(item[2],item[3],item[4],item[5],highlight===item[1]?'#cfe3bd':item[6],item[7]));
   else if(item[0]==='fill')parts.push(rect(item[1],item[2],item[3],item[4],item[5],item[6]));
   else if(item[0]==='text')parts.push(svgText(item[1],item[2],item[3],item[4]));
   else if(item[0]==='vtext')parts.push(`<text x="${item[1]}" y="${item[2]}" transform="rotate(-90 ${item[1]} ${item[2]})" text-anchor="middle" font-size="${item[4]}" fill="#42604a" font-family="Arial,sans-serif">${xmlText(item[3])}</text>`);
-  else parts.push(`<path d="${item[1]}" fill="${item[2]}" stroke="${item[3]}" stroke-width="${item[4]}"/>`);
+  else parts.push(`<path d="${svgPath(item[1])}" fill="${svgColour(item[2])}" stroke="${svgColour(item[3])}" stroke-width="${+item[4]}"/>`);
  }
- parts.push(rect(st.x,st.z,st.width,st.depth,sm.going<TARGET_GOING?'#efdcc0':'#d9ddcf','#71836b',.03));
- for(let i=0;i<sm.perFlight;i++)parts.push(`<path d="M${st.x} ${st.z+.88+i*(st.depth-.88)/sm.perFlight}h${st.width}" fill="none" stroke="#71836b" stroke-width=".03"/>`);
- parts.push(`<path d="M${st.x+st.width/2} ${st.z+.88}v${st.depth-.88}" fill="none" stroke="#71836b" stroke-width=".05"/>`);
+ parts.push(rect(st.x,st.z,st.width,st.depth,sm.band==='meets'?'#d9ddcf':'#efdcc0','#71836b',.03));
+ for(let i=0;i<sm.perFlight;i++)parts.push(`<path d="M${st.x} ${st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight}h${st.width}" fill="none" stroke="#71836b" stroke-width=".03"/>`);
+ parts.push(`<path d="M${st.x+st.width/2} ${st.z+LANDING}v${st.depth-LANDING}" fill="none" stroke="#71836b" stroke-width=".05"/>`);
  for(const c of colliders.filter(c=>c.floor===(upper?1:0)&&c.yMin<.1&&c.yMax>2))parts.push(rect(c.axis==='x'?c.a:c.c-c.thick/2,c.axis==='x'?c.c-c.thick/2:c.a,c.axis==='x'?c.b-c.a:c.thick,c.axis==='x'?c.thick:c.b-c.a,'#536556'));
  for(const [x,z] of columnPoints())parts.push(rect(x-columnSize()/2,z-columnSize()/2,columnSize(),columnSize(),'#3c5944'));
  const [vx,vy,vw,vh]=PLAN_VIEWBOX;
@@ -296,7 +324,7 @@ function renderPlan(highlight=selectedRoom){$('planView').innerHTML=svgPlan(high
 
 function resize(){const w=Math.max(1,$('canvasWrap').clientWidth),h=Math.max(1,$('canvasWrap').clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=responsiveFov(camera.aspect);camera.updateProjectionMatrix();const span=14/Math.min(1,w/h);ortho.left=-span*w/h;ortho.right=span*w/h;ortho.top=span;ortho.bottom=-span;ortho.updateProjectionMatrix();
 // Re-fit after an aspect change, but only while the user has not taken over.
-if(autoFit&&!fitting){fitting=true;placeView(autoFit);fitting=false}
+if(autoFit)placeView(autoFit);
 invalidate()}
 new ResizeObserver(resize).observe($('canvasWrap'));
 // User controls
@@ -309,7 +337,7 @@ $('style').onchange=e=>{state.style=e.target.value;update()};$('units').onchange
 function openDialog(id){keys.clear();drag=null;controls.autoRotate=false;$('rotate').classList.remove('active');$(id).showModal()}
 $('sourceBtn').onclick=()=>openDialog('sourceDialog');$('exportBtn').onclick=()=>openDialog('exportDialog');document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}}));
 $('bird').onclick=bird;$('top').onclick=()=>{if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');view([W/2,45,8.8+.001],[W/2,0,8.8],true);toast('Orthographic top view · use + / − to zoom')};$('front').onclick=()=>{setMode('exterior');view([W/2,3.5,49],[W/2,3.5,0],true);toast('Orthographic front elevation')};$('fit').onclick=()=>{if(state.mode==='plan'){planViewport.reset();applyPlanViewport()}else bird()};
-function zoom(f){if(state.mode==='plan'){planViewport.zoom(f);applyPlanViewport();return}if(state.mode==='walk'){toast('Use the arrow controls to move inside');return}if(orthoMode){ortho.zoom=THREE.MathUtils.clamp(ortho.zoom*f,.4,5);ortho.updateProjectionMatrix()}else{const offset=camera.position.clone().sub(controls.target);offset.multiplyScalar(1/f);camera.position.copy(controls.target).add(offset)}invalidate()}$('zoomIn').onclick=()=>zoom(1.2);$('zoomOut').onclick=()=>zoom(1/1.2);$('rotate').onclick=()=>{if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');if(orthoMode)bird();controls.autoRotate=!controls.autoRotate;$('rotate').classList.toggle('active',controls.autoRotate)};
+function zoom(f){releaseFit();if(state.mode==='plan'){planViewport.zoom(f);applyPlanViewport();return}if(state.mode==='walk'){toast('Use the arrow controls to move inside');return}if(orthoMode){ortho.zoom=THREE.MathUtils.clamp(ortho.zoom*f,.4,5);ortho.updateProjectionMatrix()}else{const offset=camera.position.clone().sub(controls.target);offset.multiplyScalar(1/f);camera.position.copy(controls.target).add(offset)}invalidate()}$('zoomIn').onclick=()=>zoom(1.2);$('zoomOut').onclick=()=>zoom(1/1.2);$('rotate').onclick=()=>{if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');if(orthoMode)bird();controls.autoRotate=!controls.autoRotate;$('rotate').classList.toggle('active',controls.autoRotate)};
 $('enter').onclick=()=>{const id=$('enter').dataset.room||'hall';setMode('walk');focusRoom(id)};
 $('reset').onclick=()=>{selectedRoom='';planViewport.reset();refreshPlanUI();Object.assign(state,{mode:'exterior',floor:'both',explode:0,height:3.3,roof:true,labels:true,dimensions:false,furniture:true,grid:false,style:'material',light:'day',units:'m',section:100});for(const k of ['roof','labels','dimensions','furniture','grid'])$(k).checked=state[k];for(const k of ['explode','height','style','light','units','section'])$(k).value=state[k];$('light').onchange({target:{value:'day'}});clearMeasure();measureActive=false;$('measureInfo').hidden=true;$('measure').classList.remove('active');ortho.zoom=1;build();setMode('exterior');toast('Workspace reset')};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('main').requestFullscreen()}catch{toast('Fullscreen is unavailable in this browser')}};
@@ -322,10 +350,12 @@ function dxfPlan(){
  const out=[];const p=(code,value)=>out.push(String(code),String(value));
  const line=(layer,x1,z1,x2,z2)=>{p(0,'LINE');p(8,layer);p(10,x1.toFixed(4));p(20,(-z1).toFixed(4));p(30,'0.0');p(11,x2.toFixed(4));p(21,(-z2).toFixed(4));p(31,'0.0')};
  const rect=(layer,x,z,w,d)=>{line(layer,x,z,x+w,z);line(layer,x+w,z,x+w,z+d);line(layer,x+w,z+d,x,z+d);line(layer,x,z+d,x,z)};
+ // Valid while each leaf sweep is under 180 degrees and none crosses the seam
+    // at +/-180; revisit if a door angle changes.
  const arc=(layer,cx,cz,r,a1,a2)=>{p(0,'ARC');p(8,layer);p(10,cx.toFixed(4));p(20,(-cz).toFixed(4));p(30,'0.0');p(40,r.toFixed(4));p(50,a1.toFixed(2));p(51,a2.toFixed(2))};
  const text=(layer,x,z,height,value)=>{p(0,'TEXT');p(8,layer);p(10,x.toFixed(4));p(20,(-z).toFixed(4));p(30,'0.0');p(40,height.toFixed(3));p(1,value)};
  p(0,'SECTION');p(2,'HEADER');p(9,'$INSUNITS');p(70,6);p(0,'ENDSEC');
- p(0,'SECTION');p(2,'TABLES');p(0,'TABLE');p(2,'LAYER');p(70,6);
+ p(0,'SECTION');p(2,'TABLES');p(0,'TABLE');p(2,'LAYER');p(70,7);
  for(const [name,colour] of [['A-WALL',7],['A-COLS',8],['A-GLAZ',4],['A-DOOR',3],['A-ANNO',2],['A-GRID',9],['A-STRS',6]]){p(0,'LAYER');p(2,name);p(70,0);p(62,colour);p(6,'CONTINUOUS')}
  p(0,'ENDTAB');p(0,'ENDSEC');
  p(0,'SECTION');p(2,'ENTITIES');
@@ -346,8 +376,13 @@ function dxfPlan(){
  }
  const st=plan.stair,sm=stairMetrics(st.depth,state.height);
  rect('A-STRS',st.x,st.z,st.width,st.depth);
- for(let i=0;i<sm.perFlight;i++)line('A-STRS',st.x,st.z+.88+i*(st.depth-.88)/sm.perFlight,st.x+st.width,st.z+.88+i*(st.depth-.88)/sm.perFlight);
- if(plan.rearStair)rect('A-STRS',11.65,.25,3.55,3.1);
+ for(let i=0;i<sm.perFlight;i++)line('A-STRS',st.x,st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight,st.x+st.width,st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight);
+ // The L-shaped rear well, matching the slab hole and the SVG sheet. A plain
+ // rectangle here would have shown CAD users a different stair.
+ if(plan.rearStair){
+  for(const [x1,z1,x2,z2] of [[11.65,.25,15.2,.25],[15.2,.25,15.2,1.5],[15.2,1.5,12.9,1.5],[12.9,1.5,12.9,3.35],[12.9,3.35,11.65,3.35],[11.65,3.35,11.65,.25]])line('A-STRS',x1,z1,x2,z2);
+  for(let i=0;i<10;i++){line('A-STRS',11.65,1.5+i*.185,12.9,1.5+i*.185);line('A-STRS',12.9+i*.23,.25,12.9+i*.23,1.5)}
+ }
  line('A-GRID',0,-1,W,-1);text('A-ANNO',W/2-1.4,-1.35,.28,W.toFixed(3)+' m overall width');
  line('A-GRID',-1,0,-1,D);text('A-ANNO',-2.9,D/2,.28,D.toFixed(3)+' m depth');
  const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
@@ -435,18 +470,14 @@ $('objExport').onclick=()=>{const prior={...state};Object.assign(state,{floor:'b
  toast('OBJ and MTL exported in metres')};
 // Touch-compatible first-person movement with horizontal wall/column collision.
 canvas.addEventListener('pointerdown',e=>{if(drag)return;drag={pointerId:e.pointerId,x:e.clientX,y:e.clientY,px:e.clientX,py:e.clientY};if(state.mode==='walk')canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.pointerId||state.mode!=='walk')return;walkYaw-=(e.clientX-drag.px)*.005;walkPitch=THREE.MathUtils.clamp(walkPitch-(e.clientY-drag.py)*.005,-1.2,1.2);drag.px=e.clientX;drag.py=e.clientY});canvas.addEventListener('pointerup',e=>{if(drag&&e.pointerId!==drag.pointerId)return;if(measureActive&&drag&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<8){const r=canvas.getBoundingClientRect(),mouse=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);const ray=new THREE.Raycaster();ray.setFromCamera(mouse,activeCamera);// Measuring was limited to floor slabs, which excluded the wall-to-wall reading
-// people actually want. Any solid surface now works, with a short-range snap to
-// the nearest geometry corner so wall faces and openings read cleanly.
-const hits=ray.intersectObjects(floors.filter(g=>g.visible),true).filter(h=>h.point.z<=globalClip.constant&&h.object.userData.kind!=='window'&&h.object.visible);if(hits.length){const hit=hits[0];let point=hit.point.clone();
-const geom=hit.object.geometry,corner=new THREE.Vector3();let snapped=false;
-if(hit.face&&geom?.attributes?.position){let best=.28;for(const index of [hit.face.a,hit.face.b,hit.face.c]){corner.fromBufferAttribute(geom.attributes.position,index).applyMatrix4(hit.object.matrixWorld);const d=corner.distanceTo(hit.point);if(d<best){best=d;point=corner.clone();snapped=true}}}
-if(hit.face)point.add(hit.face.normal.clone().transformDirection(hit.object.matrixWorld).multiplyScalar(.03));else point.y+=.04;
-if(measurePoints.length===2)clearMeasure();measurePoints.push(point);const marker=new THREE.Mesh(new THREE.SphereGeometry(.09,12,8),new THREE.MeshBasicMaterial({color:0x216b51}));marker.position.copy(point);measureGroup.add(marker);if(measurePoints.length===2){line(measureGroup,measurePoints.map(v=>v.toArray()),0x136b4c,true);const d=measurePoints[0].distanceTo(measurePoints[1]),flat=Math.hypot(measurePoints[1].x-measurePoints[0].x,measurePoints[1].z-measurePoints[0].z);$('measureInfo').textContent='Distance: '+formatDistance(d)+(Math.abs(d-flat)>.02?' · plan '+formatDistance(flat):'')+' · click to measure again'}else $('measureInfo').textContent='First point set'+(snapped?' (snapped to a corner)':'')+'. Click the second point on any surface.';invalidate()}else toast('Click a visible surface: floor, wall, column or fixture')}drag=null});canvas.addEventListener('pointercancel',e=>{if(drag?.pointerId===e.pointerId)drag=null});canvas.addEventListener('lostpointercapture',e=>{if(drag?.pointerId===e.pointerId)drag=null});
+// people actually want. Any solid surface now works; see measureHit for the snap.
+const hits=ray.intersectObjects(floors.filter(g=>g.visible),true).filter(h=>h.point.z<=globalClip.constant&&h.object.userData.kind!=='window'&&h.object.visible);if(hits.length){const {point,shown,snapped}=measureHit(hits[0]);
+if(measurePoints.length===2)clearMeasure();measurePoints.push(point);measureMarks.push(shown);const marker=new THREE.Mesh(new THREE.SphereGeometry(.09,12,8),new THREE.MeshBasicMaterial({color:0x216b51}));marker.position.copy(shown);measureGroup.add(marker);if(measurePoints.length===2){line(measureGroup,measureMarks.map(v=>v.toArray()),0x136b4c,true);const d=measurePoints[0].distanceTo(measurePoints[1]),flat=Math.hypot(measurePoints[1].x-measurePoints[0].x,measurePoints[1].z-measurePoints[0].z);$('measureInfo').textContent='Distance: '+formatDistance(d)+(Math.abs(d-flat)>.02?' · plan '+formatDistance(flat):'')+' · click to measure again'}else $('measureInfo').textContent='First point set'+(snapped?' (snapped to a corner)':'')+'. Click the second point on any surface.';invalidate()}else toast('Click a visible surface: floor, wall, column or fixture')}drag=null});canvas.addEventListener('pointercancel',e=>{if(drag?.pointerId===e.pointerId)drag=null});canvas.addEventListener('lostpointercapture',e=>{if(drag?.pointerId===e.pointerId)drag=null});
 // Keyboard parity for the 3D view. OrbitControls' own key handling only pans and
 // was never enabled, so there was previously no keyboard route to orbit or zoom.
 const spherical=new THREE.Spherical();
-function orbitBy(dTheta,dPhi){const offset=camera.position.clone().sub(controls.target);spherical.setFromVector3(offset);spherical.theta-=dTheta;spherical.phi=THREE.MathUtils.clamp(spherical.phi-dPhi,.08,controls.maxPolarAngle);camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(spherical));camera.lookAt(controls.target);invalidate()}
-function panBy(dx,dy){const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0),up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);const reach=camera.position.distanceTo(controls.target)*.06;const move=right.multiplyScalar(dx*reach).add(up.multiplyScalar(-dy*reach));camera.position.add(move);controls.target.add(move);camera.lookAt(controls.target);invalidate()}
+function orbitBy(dTheta,dPhi){releaseFit();const offset=camera.position.clone().sub(controls.target);spherical.setFromVector3(offset);spherical.theta-=dTheta;spherical.phi=THREE.MathUtils.clamp(spherical.phi-dPhi,.08,controls.maxPolarAngle);camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(spherical));camera.lookAt(controls.target);invalidate()}
+function panBy(dx,dy){releaseFit();const right=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0),up=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);const reach=camera.position.distanceTo(controls.target)*.06;const move=right.multiplyScalar(dx*reach).add(up.multiplyScalar(-dy*reach));camera.position.add(move);controls.target.add(move);camera.lookAt(controls.target);invalidate()}
 canvas.addEventListener('keydown',e=>{
  if(e.metaKey||e.ctrlKey||e.altKey||state.mode==='plan')return;
  if(state.mode==='walk'){const turn={q:.14,Q:.14,e:-.14,E:-.14}[e.key];if(turn===undefined)return;walkYaw+=turn;invalidate();e.preventDefault();return}
@@ -470,10 +501,10 @@ function safeWalkTarget(r){
 // function gives stair traversal and the upper-void block: a point on a flight
 // is only reachable when its surface is near the walker's current elevation.
 function stairSurface(x,z){
- const st=plan.stair,h=state.height,pad=.12,run=st.depth-.88;
+ const st=plan.stair,h=state.height,pad=.04,run=st.depth-LANDING;
  if(x>=st.x-pad&&x<=st.x+st.width+pad&&z>=st.z-pad&&z<=st.z+st.depth+pad){
-  if(z<=st.z+.88)return h/2;
-  const t=Math.max(0,Math.min(1,(z-(st.z+.88))/run));
+  if(z<=st.z+LANDING)return h/2;
+  const t=Math.max(0,Math.min(1,(z-(st.z+LANDING))/run));
   return x<=st.x+st.width/2?h/2*(1-t):h/2*(1+t);
  }
  if(plan.rearStair&&x>=11.65-pad&&x<=15.2+pad&&z>=.25-pad&&z<=3.35+pad){
@@ -482,20 +513,28 @@ function stairSurface(x,z){
  }
  return null;
 }
+const STEP=.3;
 function walkElevation(){return state.mode==='walk'&&stairSurface(camera.position.x,camera.position.z)!==null?walkY:floorY()}
 function canWalk(x,z,y=walkElevation()){if(x<.35||x>W-.35||z<.35||z>D+E-.35||(x<EX+.3&&z>D-.35))return false;
  const surface=stairSurface(x,z);
- if(surface!==null)return Math.abs(surface-y)<=.5;
+ if(surface!==null){
+  // STEP bounds both the climb and the void block. Legitimate movement changes
+  // the surface by at most ~0.12 m per frame, so this permits walking up while
+  // refusing a vertical hop between the two flights.
+  if(Math.abs(surface-y)>STEP)return false;
+  // The enclosing walls are the well itself, but loose obstacles still apply.
+  return !(state.furniture&&furnitureObstacles.some(o=>Math.abs(x-o.x)<o.w/2+.18&&Math.abs(z-o.z)<o.d/2+.18));
+ }
  // Off a flight you must be standing at a storey level, never part-way up one.
- if(Math.abs(y)>.5&&Math.abs(y-state.height)>.5)return false;
- const level=Math.abs(y-state.height)<.5?1:0;if(state.furniture&&furnitureObstacles.some(o=>o.floor===level&&Math.abs(x-o.x)<o.w/2+.18&&Math.abs(z-o.z)<o.d/2+.18))return false;for(const c of colliders){if(c.floor!==level||c.yMin>1.7||c.yMax<1.7)continue;const along=c.axis==='x'?x:z,cross=c.axis==='x'?z:x;if(along>c.a-.16&&along<c.b+.16&&Math.abs(cross-c.c)<c.thick/2+.18)return false}for(const [cx,cz] of [...columnPoints(),...[EX+.11,12.72,W-.11].map(cx=>[cx,D+E-.11])])if(Math.abs(x-cx)<columnSize()/2+.18&&Math.abs(z-cz)<columnSize()/2+.18)return false;for(const o of openingsDrawn.filter(o=>o.floor===level&&o.door)){const angle=o.axis==='x'?(o.inward?Math.PI*.34:-Math.PI*.34):-Math.PI/2-Math.PI*.16,px=o.axis==='x'?o.a:o.c,pz=o.axis==='x'?o.c:o.a,w=o.b-o.a,dx=x-px,dz=z-pz,along=dx*Math.cos(angle)-dz*Math.sin(angle),cross=dx*Math.sin(angle)+dz*Math.cos(angle);if(along>-.16&&along<w+.16&&Math.abs(cross)<.19)return false}return true}
+ if(Math.abs(y)>STEP&&Math.abs(y-state.height)>STEP)return false;
+ const level=Math.abs(y-state.height)<STEP?1:0;if(state.furniture&&furnitureObstacles.some(o=>o.floor===level&&Math.abs(x-o.x)<o.w/2+.18&&Math.abs(z-o.z)<o.d/2+.18))return false;for(const c of colliders){if(c.floor!==level||c.yMin>1.7||c.yMax<1.7)continue;const along=c.axis==='x'?x:z,cross=c.axis==='x'?z:x;if(along>c.a-.16&&along<c.b+.16&&Math.abs(cross-c.c)<c.thick/2+.18)return false}for(const [cx,cz] of [...columnPoints(),...[EX+.11,12.72,W-.11].map(cx=>[cx,D+E-.11])])if(Math.abs(x-cx)<columnSize()/2+.18&&Math.abs(z-cz)<columnSize()/2+.18)return false;for(const o of openingsDrawn.filter(o=>o.floor===level&&o.door)){const angle=o.axis==='x'?(o.inward?Math.PI*.34:-Math.PI*.34):-Math.PI/2-Math.PI*.16,px=o.axis==='x'?o.a:o.c,pz=o.axis==='x'?o.c:o.a,w=o.b-o.a,dx=x-px,dz=z-pz,along=dx*Math.cos(angle)-dz*Math.sin(angle),cross=dx*Math.sin(angle)+dz*Math.cos(angle);if(along>-.16&&along<w+.16&&Math.abs(cross)<.19)return false}return true}
 const labelRay=new THREE.Raycaster();const labelBounds=[];let lastLabelTime=0;
 function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-lastTime)/1000,.05);lastTime=now;if(document.hidden)return;const paused=!!document.querySelector('dialog[open]')||drawer.isOpen();if(paused)keys.clear();if(state.mode==='walk'){const f=(keys.has('w')||keys.has('ArrowUp')?1:0)-(keys.has('s')||keys.has('ArrowDown')?1:0),s=(keys.has('d')||keys.has('ArrowRight')?1:0)-(keys.has('a')||keys.has('ArrowLeft')?1:0);const norm=f&&s?Math.SQRT1_2:1,dx=(-Math.sin(walkYaw)*f+Math.cos(walkYaw)*s)*dt*2.5*norm,dz=(-Math.cos(walkYaw)*f-Math.sin(walkYaw)*s)*dt*2.5*norm;if(canWalk(camera.position.x+dx,camera.position.z,walkY))camera.position.x+=dx;if(canWalk(camera.position.x,camera.position.z+dz,walkY))camera.position.z+=dz;
 // Follow the stair surface, and snap to the nearest storey once off a flight.
 const surface=stairSurface(camera.position.x,camera.position.z);
-walkY=surface!==null?surface:(Math.abs(walkY-state.height)<.5?state.height:0);
+walkY=surface!==null?surface:(Math.abs(walkY-state.height)<STEP?state.height:0);
 camera.position.y=walkY+1.65;
-const reached=Math.abs(walkY-state.height)<.5?'1':'0';
+const reached=Math.abs(walkY-state.height)<STEP?'1':'0';
 if(state.floor!==reached&&surface===null){state.floor=reached;update();toast(reached==='1'?'First floor · assumed repeat':'Ground floor')}
 camera.rotation.order='YXZ';camera.rotation.set(walkPitch,walkYaw,0);if(f||s||drag||surface!==null)invalidate()}else if(!orthoMode&&state.mode!=='plan'){controls.update();if(controls.autoRotate)invalidate()}
 if(state.mode!=='plan'&&needsRender){renderer.render(scene,activeCamera);needsRender=false}if(!labelsDirty||now-lastLabelTime<120)return;lastLabelTime=now;labelsDirty=false;const width=$('canvasWrap').clientWidth,height=$('canvasWrap').clientHeight;labelBounds.length=0;
@@ -510,14 +549,24 @@ function syncURL(){try{clearTimeout(urlTimer);urlTimer=setTimeout(()=>{try{const
  window.history.replaceState(null,'',url)}catch{}},400)}catch{}}
 function applyURLState(){
  const p=new URLSearchParams(window.location.search);
- const height=Number(p.get('h'));if(height>=2.8&&height<=4.5){state.height=height;$('height').value=String(height)}
+ // switchPlan has already built, so only rebuild if a parameter actually
+ // changes geometry. Rebuilding unconditionally meant 774 meshes twice per load.
+ let rebuild=false;
+ const height=Number(p.get('h'));
+ if(height>=2.8&&height<=4.5&&Math.abs(height-state.height)>1e-9){state.height=height;$('height').value=String(height);rebuild=true}
  for(const key of ['light','style','units']){const value=p.get(key);if(value&&[...$(key).options].some(o=>o.value===value)){state[key]=value;$(key).value=value}}
  if(p.has('layers')){const on=new Set(p.get('layers').split(','));for(const key of LAYERS){state[key]=on.has(key);$(key).checked=state[key]}}
  $('light').onchange({target:{value:state.light}});
- build();
+ if(rebuild)build();
  const view=p.get('view');if(['cutaway','exterior','walk','plan'].includes(view))setMode(view);
  const floor=p.get('floor');
- if(['both','0','1'].includes(floor)&&!(floor==='both'&&(state.mode==='plan'||state.mode==='walk'))){state.floor=floor;if(p.has('layers')){const on=new Set(p.get('layers').split(','));state.roof=on.has('roof');$('roof').checked=state.roof}update()}
+ if(['both','0','1'].includes(floor)&&!(floor==='both'&&(state.mode==='plan'||state.mode==='walk'))){
+  state.floor=floor;
+  if(p.has('layers')){const on=new Set(p.get('layers').split(','));state.roof=on.has('roof');$('roof').checked=state.roof}
+  // Restore the walker's elevation too, or the first frame snaps back downstairs.
+  if(state.mode==='walk'){walkY=floorY();camera.position.set(rooms.hall.x,walkY+1.65,rooms.hall.z)}
+  update();
+ }
 }
 $('planSelect').onchange=e=>switchPlan(e.target.value);let initialPlan='A';try{initialPlan=new URLSearchParams(window.location.search).get('plan')||window.localStorage.getItem('plan-atlas-plan')||'A'}catch{}switchPlan(plans[initialPlan]?initialPlan:'A',false);
 try{applyURLState()}catch{}
