@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {responsiveFov} from '../dist/mobile-ui.js';
+import {PLAN_VIEWBOX,planSheetNotes,planAGrid,goingBand,LANDING} from '../dist/plans.js';
 const root=fileURLToPath(new URL('../dist/',import.meta.url));
 const temp=await fs.mkdtemp(path.join(tmpdir(),'plan-atlas-test-'));
 const testModule=path.join(temp,'model-under-test.mjs');
@@ -15,7 +16,7 @@ const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'}
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.min.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){}addEventListener(){}listenToKeyEvents(){} }`);
 source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`).replace("from './plans.js'",`from 'file://${root}plans.js'`).replace("from './plan-navigation.js'",`from 'file://${root}plan-navigation.js'`);
-source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,stairMetrics,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,keys,dimGroup,planAGrid,interiorLights,scene,dxfPlan,glbModel,stairSurface,frameRadius,fitDistance,walkY};';
+source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,stairMetrics,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,measureHit,keys,dimGroup,interiorLights,scene,dxfPlan,glbModel,stairSurface,frameRadius,fitDistance,walkY};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
 assert.equal(document.getElementById('labelLayer').hidden,true,'2D fallback hides unprojected 3D labels');assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
@@ -154,7 +155,7 @@ console.log('Audit regressions passed: drawing room sizes, column rows, rear ent
 // Review fixes. Each assertion pins a finding so it cannot silently regress.
 // ---------------------------------------------------------------------------
 m.switchPlan('A',false);m.state.height=3.3;m.state.floor='0';m.build();m.model.updateMatrixWorld(true);
-const FOOT=.3048,INCH=.0254,g=m.planAGrid;
+const FOOT=.3048,INCH=.0254,g=planAGrid;
 assert.equal(m.plan.width,16.74,'Plan A adopts the printed 16.740 m outer width from drawing 218124');
 assert.ok(Math.abs(m.plan.extension-3.7226)<1e-9,'Plan A projection uses the 12′2½″ / 3722.57 mm reading');
 // The old figure may survive in the conflict prose that explains the correction,
@@ -182,6 +183,13 @@ for(const plan of ['A','B']){m.switchPlan(plan,false);const svg=m.svgPlan();
  assert.ok(svg.includes('PLAN ATLAS · BANQUET HALL'),plan+' sheet has a title block');
  assert.ok(svg.includes('BAYS'),plan+' sheet carries a bay dimension chain');
  assert.ok(!/&(?!amp;|lt;|gt;|quot;|apos;|#)/.test(svg),plan+' sheet text stays XML escaped');
+ const [vx,vy,vw,vh]=PLAN_VIEWBOX;
+ for(const [,y,h] of svg.matchAll(/<rect[^>]*\by="([-\d.]+)"[^>]*\bheight="([-\d.]+)"/g))
+  assert.ok(Number(y)>=vy-1e-6&&Number(y)+Number(h)<=vy+vh+1e-6,plan+' sheet rect stays on the sheet (y='+y+' h='+h+')');
+ for(const [,y] of svg.matchAll(/<text[^>]*\by="([-\d.]+)"/g))
+  assert.ok(Number(y)>=vy&&Number(y)<=vy+vh,plan+' sheet text stays on the sheet (y='+y+')');
+ for(const note of planSheetNotes(m.plan,m.stairMetrics(m.plan.stair.depth,3.3)))
+  assert.ok(svg.includes(note.slice(2,40)),plan+' conflict footnote is actually drawn');
 }
 // Dimensions are a single annotation layer rather than one copy per storey.
 m.switchPlan('A',false);
@@ -214,6 +222,20 @@ for(const h of [2.8,3.3,4.5]){m.state.height=h;m.build();const review=m.stairRev
 m.state.height=3.3;m.switchPlan('B',false);
 assert.ok(m.stairReview().front.shortfall<.05,'Plan B stair is close to the going target');
 assert.ok(m.stairReview().front.verdict.includes('marginal'),'Plan B stair reported as marginal, not compliant');
+// The tread tint, the readout and the exported verdict must agree on one word.
+for(const id of ['A','B']){m.switchPlan(id,false);m.state.height=3.3;m.build();
+ const review=m.stairReview().front,band=goingBand(review.tread);
+ assert.equal(review.band,band,id+' band is derived from the shared going test');
+ assert.ok(review.verdict.startsWith(band==='meets'?'meets':band),id+' verdict uses the band vocabulary');
+ const flight=m.floors[0].getObjectByName('Front stair lower flight');
+ assert.equal(flight.material.userData.base.getHexString(),band==='meets'?'c7b89f':'d9a961',id+' tread tint matches the band');
+ const sheet=m.svgPlan();
+ assert.ok(sheet.includes(band==='meets'?'#d9ddcf':'#efdcc0'),id+' sheet tint matches the band');
+ // The landing depth is shared, so the sheet's first tread must sit on it.
+ const treads=[...sheet.matchAll(/M([\d.]+) ([\d.]+)h([\d.]+)" fill="none" stroke="#71836b"/g)];
+ assert.equal(treads.length,review.risers/2,id+' sheet draws one tread per riser in a flight');
+ assert.ok(Math.abs(Number(treads[0][2])-(m.plan.stair.z+LANDING))<1e-6,id+' first tread starts at the shared landing depth');
+}
 // Guard: the renderer must stay plan-agnostic, so a further alternative is a
 // data entry in plans.js rather than a second code path. Two hand-written
 // geometry lists are what let the column grid drift out of sync in the first place.
@@ -225,6 +247,39 @@ assert.ok(m.stairReview().front.verdict.includes('marginal'),'Plan B stair repor
   assert.ok(appSource.includes(descriptor),'the renderer consumes '+descriptor);
  const planSource=await fs.readFile(root+'plans.js','utf8');
  assert.ok(!/\bTHREE\b/.test(planSource),'layout data stays free of three.js objects');
+}
+// Measurement must record the exact surface point. Lifting the stored point off
+// the face, rather than only the marker, made every wall-to-wall reading about
+// 60 mm short -- a systematic error in a dimensional tool.
+{
+ const box=new THREE.Mesh(new THREE.BoxGeometry(2,2,2),new THREE.MeshBasicMaterial());
+ box.position.set(5,1,5);box.updateMatrixWorld(true);
+ const faceNormal=new THREE.Vector3(1,0,0);
+ // A hit in the middle of the +x face, far from any corner: no snap, exact point.
+ const mid=m.measureHit({point:new THREE.Vector3(6,1,5),object:box,face:{a:0,b:1,c:2,normal:faceNormal}});
+ assert.equal(mid.snapped,false,'a mid-face hit does not snap');
+ assert.ok(mid.point.distanceTo(new THREE.Vector3(6,1,5))<1e-9,'the recorded point is the exact hit');
+ assert.ok(Math.abs(mid.shown.x-6.03)<1e-6,'only the marker is lifted off the face');
+ // Two opposing outer faces of a 2 m box must read exactly 2 m. The markers sit
+ // 30 mm clear of each face, so they are 2.06 apart -- which is what the old code
+ // reported, because it offset the recorded point as well.
+ const far=m.measureHit({point:new THREE.Vector3(4,1,5),object:box,face:{a:0,b:1,c:2,normal:new THREE.Vector3(-1,0,0)}});
+ assert.ok(Math.abs(mid.point.distanceTo(far.point)-2)<1e-9,'an across-the-box reading is exact');
+ assert.ok(Math.abs(mid.shown.distanceTo(far.shown)-2.06)<1e-6,'the markers stand clear of both faces');
+ // The room case, where the error ran the other way: two walls whose faces look
+ // inward at each other across a 4 m gap must read 4 m, not 3.94 m.
+ const left=new THREE.Mesh(new THREE.BoxGeometry(.2,2,2),new THREE.MeshBasicMaterial());
+ left.position.set(0,1,0);left.updateMatrixWorld(true);
+ const right=new THREE.Mesh(new THREE.BoxGeometry(.2,2,2),new THREE.MeshBasicMaterial());
+ right.position.set(4.2,1,0);right.updateMatrixWorld(true);
+ const inner=[m.measureHit({point:new THREE.Vector3(.1,1,0),object:left,face:{a:0,b:1,c:2,normal:new THREE.Vector3(1,0,0)}}),
+              m.measureHit({point:new THREE.Vector3(4.1,1,0),object:right,face:{a:0,b:1,c:2,normal:new THREE.Vector3(-1,0,0)}})];
+ assert.ok(Math.abs(inner[0].point.distanceTo(inner[1].point)-4)<1e-9,'a wall-to-wall clear span is exact');
+ assert.ok(Math.abs(inner[0].shown.distanceTo(inner[1].shown)-3.94)<1e-6,'markers inside the room, reading unaffected');
+ // A hit near a corner snaps to it, and the snapped point is still exact.
+ const near=m.measureHit({point:new THREE.Vector3(6,1.9,5.9),object:box,face:{a:0,b:1,c:2,normal:faceNormal}});
+ assert.equal(near.snapped,true,'a hit within 280 mm of a corner snaps');
+ assert.ok(near.point.distanceTo(new THREE.Vector3(6,2,6))<1e-6,'the snap lands on the corner itself');
 }
 // Walkthrough stair traversal: the flights are continuous and carry you between
 // storeys, while still refusing to let you float over the upper void.

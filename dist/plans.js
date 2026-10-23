@@ -90,13 +90,17 @@ export function planColumns(plan){
 // Risers are capped so the slider cannot produce an impossible stair; the going
 // shortfall that the drawn footprint cannot fix is reported instead of hidden.
 export const MAX_RISE=.19, TARGET_GOING=.25, LANDING=.88;
+// One vocabulary for stair adequacy, so the tread tint, the sidebar readout and
+// the exported specification cannot describe the same stair differently.
+export function goingBand(going){return going>=TARGET_GOING?'meets':going>=TARGET_GOING-.01?'marginal':'diagrammatic'}
+export function flightRisers(height){return Math.max(10,Math.ceil(height/2/MAX_RISE))}
 export function stairMetrics(depth,height){
- const perFlight=Math.max(10,Math.ceil(height/2/MAX_RISE));
+ const perFlight=flightRisers(height);
  const rise=height/(perFlight*2),going=(depth-LANDING)/perFlight;
- const requiredDepth=LANDING+perFlight*TARGET_GOING;
- return {perFlight,risers:perFlight*2,rise,going,requiredDepth,
+ const requiredDepth=LANDING+perFlight*TARGET_GOING,band=goingBand(going);
+ return {perFlight,risers:perFlight*2,rise,going,requiredDepth,band,
   shortfall:Math.max(0,requiredDepth-depth),
-  verdict:going>=TARGET_GOING?'meets the 250 mm going target':going>=.24?'marginal: just under the 250 mm going target':'diagrammatic: the going is far below any usable stair'};
+  verdict:{meets:'meets the 250 mm going target',marginal:'marginal: just under the 250 mm going target',diagrammatic:'diagrammatic: the going is far below any usable stair'}[band]};
 }
 
 // Sheet extents: building plus dimension chains, scale bar, north arrow and title block.
