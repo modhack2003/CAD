@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# The reference drawing photographs are never served from this origin; they are
+# opened locally in the visitor's browser and are not part of the deployment.

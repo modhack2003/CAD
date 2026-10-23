@@ -1,5 +1,5 @@
 // View-box navigation keeps SVG labels sharp at every zoom, including offline fallback.
-export function createPlanViewport(initial=[-2,-2,21,23]){
+export function createPlanViewport(initial=[-3,-3,23,26]){
  let base=[...initial],view=[...initial];
  return {
   get value(){return [...view]},

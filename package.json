@@ -6,7 +6,7 @@
   "description": "Two-floor architectural explorer reconstructed from drawing 218129",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "test": "node tests/geometry.mjs && node tests/mobile.mjs && node tests/plan-navigation.mjs",
+    "test": "node tests/geometry.mjs && node tests/mobile.mjs && node tests/plan-navigation.mjs && node scripts/check-csp.mjs",
     "build": "npm test"
   },
   "engines": {
