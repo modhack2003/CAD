@@ -7,13 +7,14 @@ const root=fileURLToPath(new URL('../dist/',import.meta.url));
 const temp=await fs.mkdtemp(path.join(tmpdir(),'plan-atlas-test-'));
 const testModule=path.join(temp,'model-under-test.mjs');
 const elements=new Map();
-function el(id=''){return {id,style:{},dataset:{},children:[],clientWidth:1100,clientHeight:850,classList:{add(){},remove(){},toggle(){}},append(x){this.children.push(x)},appendChild(x){this.children.push(x)},remove(){},click(){},addEventListener(){},getRootNode(){return {addEventListener(){}}},getContext(type){return type==='2d'?{fillRect(){},strokeRect(){}}:null},setAttribute(){}}}
-globalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,el(id));return elements.get(id)},createElement:el,querySelectorAll(){return []},querySelector(){return null},body:el()};
-globalThis.window={addEventListener(){}};globalThis.devicePixelRatio=1;globalThis.requestAnimationFrame=()=>{};globalThis.ResizeObserver=class{observe(){}};
+function el(id=''){return {id,style:{},dataset:{},children:[],clientWidth:1100,clientHeight:850,classList:{add(){},remove(){},toggle(){}},append(x){this.children.push(x)},appendChild(x){this.children.push(x)},remove(){},focus(){},removeAttribute(){},querySelectorAll(){return []},click(){},addEventListener(){},getRootNode(){return {addEventListener(){}}},getContext(type){return type==='2d'?{fillRect(){},strokeRect(){}}:null},setAttribute(){}}}
+globalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,el(id));return elements.get(id)},createElement:el,querySelectorAll(){return []},querySelector(){return el()},addEventListener(){},body:el()};
+globalThis.window={addEventListener(){},matchMedia(){return {matches:false,addEventListener(){}}}};globalThis.devicePixelRatio=1;globalThis.requestAnimationFrame=()=>{};globalThis.ResizeObserver=class{observe(){}};
 const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'};URL.revokeObjectURL=()=>{};
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){} }`);
-source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site};';
+source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`).replace("from './plans.js'",`from 'file://${root}plans.js'`);
+source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
 assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
@@ -55,5 +56,26 @@ for(const height of [2.8,4.5]){m.state.height=height;m.build();m.model.updateMat
 m.state.height=3.3;m.build();m.model.updateMatrixWorld(true);m.site.updateMatrixWorld(true);
 const canopy=m.floors[0].getObjectByName('Entrance canopy');const support=m.floors[0].getObjectByName('Canopy support');assert.ok(canopy&&support);const supportBounds=new THREE.Box3().setFromObject(support);assert.ok(Math.abs(supportBounds.min.y)<1e-6);assert.ok(supportBounds.max.y>=new THREE.Box3().setFromObject(canopy).min.y,'column reaches canopy');
 console.log('Banquet checks passed: glazing at height limits, glass collision, supported canopy.');
+// Both alternatives must switch completely, with independent exports and voids.
+m.switchPlan('B',false);assert.equal(m.plan.drawing,'218124');assert.equal(m.floors.length,2);
+const count=(group,name)=>{let n=0;group.traverse(o=>{if(o.name===name)n++});return n};
+for(const floor of m.floors){assert.equal(count(floor,'WC pedestal'),3);assert.equal(count(floor,'Urinal fixture'),3);assert.ok(floor.getObjectByName('Plan B Front room divider'));assert.ok(!floor.getObjectByName('Rear L stair lower flight'));assert.ok(!floor.getObjectByName('Rear room A / upper WC'));}
+assert.equal(count(m.model,'Front stair lower flight'),10);
+Object.assign(m.state,{floor:'1',mode:'exterior'});m.update();m.model.updateMatrixWorld(true);
+assert.ok(!m.canWalk(10,16),'Plan B front stair void blocks walking');assert.ok(m.canWalk(12.2,2),'Plan B has no phantom rear stair void');
+const bFirst=m.floors[1],bLeaf=bFirst.getObjectByName('First-floor landing entry').getObjectByName('Open door leaf');const bBounds=new THREE.Box3().setFromObject(bLeaf),bSlab=bFirst.children.find(o=>o.name==='Floor slab');
+for(const x of [bBounds.min.x+.04,bBounds.max.x-.04])for(const z of [bBounds.min.z+.04,bBounds.max.z-.04]){ray.set(new THREE.Vector3(x,3.5,z),new THREE.Vector3(0,-1,0));assert.ok(ray.intersectObject(bSlab).length,'Plan B upper doorway supported');}
+const footprint=new THREE.Box3().setFromObject(bSlab);assert.ok(Math.abs(footprint.max.x-16.74)<1e-5);assert.ok(Math.abs(footprint.max.z-18.551)<1e-5);
+const bSvg=m.svgPlan();assert.ok(bSvg.includes('218124'));assert.ok(bSvg.includes('FRONT ROOM 2'));assert.ok(bSvg.includes('3.773 m'));assert.ok(!bSvg.includes('ROOM B'));
+document.getElementById('jsonExport').onclick();const spec=JSON.parse(await downloads.at(-1).text());assert.equal(spec.plan,'B');assert.equal(spec.mainBlock.width,16.74);assert.equal(spec.frontExtension.provisional,true);assert.equal(spec.stairs.rear,false);
+document.getElementById('objExport').onclick();const bObj=await downloads.at(-1).text();assert.ok(bObj.includes('drawing 218124'));assert.ok(!/NaN|Infinity/.test(bObj));assert.ok(bObj.includes('Plan_B_Front_room_divider'));assert.ok(!bObj.includes('Rear_L_stair'));
+const bLines=bObj.split('\n'),bVertices=bLines.filter(l=>l.startsWith('v ')).length;for(const line of bLines.filter(l=>l.startsWith('f ')))for(const index of line.slice(2).split(' ').map(Number))assert.ok(index>=1&&index<=bVertices);
+const tally=()=>{let n=0;m.model.traverse(o=>{if(o.isMesh)n++});return n};const bCount=tally();
+for(const h of [2.8,4.5]){m.state.height=h;m.build();m.model.traverse(o=>{if(o.isMesh)for(const value of o.geometry.attributes.position.array)assert.ok(Number.isFinite(value))});assert.equal(tally(),bCount)}
+m.state.height=3.3;m.switchPlan('A',false);assert.equal(count(m.floors[0],'WC pedestal'),4);assert.ok(m.floors[0].getObjectByName('Rear L stair lower flight'));assert.ok(!m.floors[0].getObjectByName('Plan B fixtures'));
+document.getElementById('sourceUpload').onchange({target:{files:[{type:'image/jpeg',size:100}]}});assert.equal(document.getElementById('sourcePreview').hidden,false);m.switchPlan('B',false);assert.equal(document.getElementById('sourcePreview').hidden,true,'Plan A photograph not shown for B');m.switchPlan('A',false);assert.equal(document.getElementById('sourcePreview').hidden,false);
+m.switchPlan(process.env.CAD_RENDER_PLAN==='B'?'B':'A',false);Object.assign(m.state,{mode:'exterior',floor:'both',roof:true});m.update();m.model.updateMatrixWorld(true);m.site.updateMatrixWorld(true);
+console.log('Plan B checks passed: distinct layout, three WCs, single stair, slab/entry support, height limits, exports and repeated plan switching.');
+if(process.env.CAD_SVG_OUTPUT)await fs.writeFile(process.env.CAD_SVG_OUTPUT,m.svgPlan());
 if(process.env.CAD_GEOMETRY_OUTPUT){const meshes=[];for(const group of [m.model,m.site])group.traverse(o=>{if(!o.isMesh)return;let p=o;while(p){if(!p.visible)return;p=p.parent}const pos=o.geometry.attributes.position;const vertices=[];const point=new THREE.Vector3();for(let i=0;i<pos.count;i++){point.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);vertices.push(point.toArray())}meshes.push({name:o.name,vertices,indices:o.geometry.index?Array.from(o.geometry.index.array):Array.from({length:pos.count},(_,i)=>i),color:o.material.color.getHexString()})});await fs.writeFile(process.env.CAD_GEOMETRY_OUTPUT,JSON.stringify(meshes));}
 await fs.rm(temp,{recursive:true,force:true});

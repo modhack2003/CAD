@@ -6,8 +6,10 @@
   "description": "Two-floor architectural explorer reconstructed from drawing 218129",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "test": "node tests/geometry.mjs",
+    "test": "node tests/geometry.mjs && node tests/mobile.mjs",
     "build": "npm test"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }
