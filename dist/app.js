@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { responsiveFov, setupDrawer } from './mobile-ui.js';
-import {plans,planAGrid,planAPartitions,planBPartitions,planColumns,stairMetrics,TARGET_GOING,PLAN_VIEWBOX} from './plans.js';
+import {plans,planAGrid,planColumns,planShell,planFixtures,planLabels,planRails,planSheet,planSheetNotes,stairMetrics,TARGET_GOING,PLAN_VIEWBOX} from './plans.js';
 
 const $=id=>document.getElementById(id);
 const touchDevice=window.matchMedia('(pointer:coarse)').matches;
@@ -14,7 +14,7 @@ let plan=plans.A,W=plan.width,D=plan.depth,E=plan.extension,EX=plan.extensionX,r
 const state={mode:'exterior',floor:'both',explode:0,height:3.3,roof:true,labels:true,dimensions:false,furniture:true,grid:false,style:'material',light:'day',units:'m',section:100};
 const drawingURLs={};
 function columnPoints(){return planColumns(plan)}
-function columnSize(){return plan.id==='B'?.25:.28}
+function columnSize(){return plan.columnSize}
 let toastTimer;function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3800)}
 const scene=new THREE.Scene();scene.background=new THREE.Color('#e7ebe1');
 const canvas=$('scene');let renderer,webglAvailable=true;
@@ -33,8 +33,7 @@ const fill=new THREE.DirectionalLight(0xdbeeff,1.25);fill.position.set(24,12,-16
 // A banquet hall is sold on its lighting, so the interior has its own fittings
 // rather than relying on ambient hemisphere light alone.
 const interiorLights=Array.from({length:4},()=>{const l=new THREE.PointLight(0xffd9a8,0,12,2);scene.add(l);return l});
-function hallLightPoints(){return plan.id==='B'?[[6.5,3],[13,3],[6.5,8.5],[13,8.5]]:[[5,6.5],[12,6.5],[5,11],[12,11]]}
-const ceilingGroup=new THREE.Group();scene.add(ceilingGroup);
+function hallLightPoints(){return plan.hallLights}
 const globalClip=new THREE.Plane(new THREE.Vector3(0,0,-1),100);
 const palette={wall:0xf4ead8,partition:0xe7e4d7,slab:0xd9cbb5,stone:0xc7b89f,wood:0x96765a,metal:0x514238,glass:0x77b3bb,tile:0xc9d6ce,sanitary:0xf9f8ee,seat:0xa9b89a};
 const materials=[],model=new THREE.Group(),roofGroup=new THREE.Group(),dimGroup=new THREE.Group();dimGroup.name='Dimensions';scene.add(model);let floors=[],labelDefs=[],colliders=[],openingsDrawn=[],furnitureObstacles=[],modelObjects=[],cutMaterials=[];
@@ -66,19 +65,17 @@ function rearStairs(g,h){const sm=stairMetrics(2.73,h),n=sm.perFlight,tm=treadMa
 function deskSet(f,x,z){box(f,'Room desk',x,.75,z,1.5,.09,.7,mats.wood,'furniture');for(const dx of [-.65,.65])box(f,'Desk leg',x+dx,.36,z,.06,.72,.5,mats.metal,'furniture');box(f,'Chair seat',x,.48,z+.65,.48,.1,.48,mats.seat,'furniture');box(f,'Chair back',x,.78,z+.87,.48,.55,.06,mats.seat,'furniture');for(const dx of [-.18,.18])for(const dz of [-.18,.18])box(f,'Chair leg',x+dx,.215,z+.65+dz,.045,.43,.045,mats.metal,'furniture')}
 function benches(f,xs,zs){for(const z of zs)for(const x of xs){box(f,'Hall bench',x,.46,z,1.8,.11,.5,mats.wood,'furniture');for(const dx of [-.65,.65])box(f,'Bench support',x+dx,.22,z,.09,.44,.4,mats.metal,'furniture')}}
 function diningTable(f,x,z){box(f,'Round table top',x,.74,z,1.3,.07,1.3,mats.wood,'furniture');box(f,'Table pedestal',x,.37,z,.22,.68,.22,mats.metal,'furniture');for(const [dx,dz] of [[-.85,0],[.85,0],[0,-.85],[0,.85]]){box(f,'Dining chair seat',x+dx,.45,z+dz,.45,.1,.45,mats.seat,'furniture');box(f,'Dining chair back',x+dx*1.26,.75,z+dz*1.26,dz?.45:.06,.5,dz?.06:.45,mats.seat,'furniture')}}
-function furniture(g){const f=new THREE.Group();f.userData.kind='fixtures';g.add(f);const q=planAGrid;
-const leftX=(q.roomAWall+q.leftWcWall)/2,rightX=(q.roomBWall+q.rightWcWall)/2;
-const upperZ=(q.outerFace+q.outerFace+q.wcUpper)/2,leftLowerZ=(q.wcDivider+q.part+q.leftWcFront-q.part)/2,rightLowerZ=(q.wcDivider+q.part+q.hallFace)/2;
-for(const [x,z] of [[leftX,upperZ],[leftX,leftLowerZ],[rightX,upperZ],[rightX,rightLowerZ]])toilet(f,x,z);
-// The drawing labels a BASIN & URINAL zone either side of the 3'2" wash passage.
-for(const z of [.75,1.45,2.15]){box(f,'Urinal fixture',q.urinalFace+.17,.72,z,.34,.65,.4,mats.sanitary,'furniture');box(f,'Urinal drain',q.urinalFace+.14,.04,z,.28,.08,.34,mats.metal,'furniture')}
-box(f,'Urinal divider',q.urinalFace+.2,.6,1.8,.4,1.2,.03,mats.partition,'furniture');
-const basinX=(q.passageEnd+q.washWall-q.part)/2;
-box(f,'Wash counter',basinX,.85,1.7,.6,.15,2.5,mats.stone,'furniture');box(f,'Wash cabinet support',basinX,.385,1.7,.54,.77,2.45,mats.wood,'furniture');
-for(const z of [.8,1.7,2.6]){box(f,'Wash basin',basinX-.06,.96,z,.46,.08,.5,mats.sanitary,'furniture');box(f,'Tap',basinX+.19,1.12,z,.03,.25,.03,mats.metal,'furniture')}
-deskSet(f,(q.outerFace+q.roomAWall-q.part)/2,1.25);deskSet(f,(q.leftWcWall+q.roomBWall)/2,1.25);
-benches(f,[3,14.5],[5.6,8.1,11.6]);
-return f}
+// Fixture descriptors are interpreted here so the layout data stays free of
+// three.js objects and remains serialisable.
+function buildFixtures(g){const f=new THREE.Group();f.name=plan.name+' fixtures';f.userData.kind='fixtures';g.add(f);
+ for(const item of planFixtures(plan)){
+  if(item[0]==='wc')toilet(f,item[1],item[2]);
+  else if(item[0]==='desk')deskSet(f,item[1],item[2]);
+  else if(item[0]==='table')diningTable(f,item[1],item[2]);
+  else if(item[0]==='benches')benches(f,item[1],item[2]);
+  else box(f,item[1],item[2],item[3],item[4],item[5],item[6],item[7],mats[item[8]],'furniture');
+ }
+ return f}
 
 function banquetFacade(g,level,h){
  const f=new THREE.Group();f.name='Banquet facade';f.userData.cut=true;g.add(f);
@@ -87,7 +84,7 @@ function banquetFacade(g,level,h){
   box(f,'Bronze reveal',x,h-.19,z,w,.035,d+.015,exteriorMats.bronze);
   box(f,'Warm facade light',x,h-.23,z,w,.025,d+.02,exteriorMats.glow);
  }
- for(const x of (plan.id==='B'?[.2,6.23,EX-.25]:[.2,4.83,8.4])){box(f,'Front stone pier',x,h/2,D+.15,.34,h,.28,mats.stone);box(f,'Pier bronze inlay',x,h/2,D+.3,.055,h-.15,.025,exteriorMats.bronze)}
+ for(const x of plan.facadePiers){box(f,'Front stone pier',x,h/2,D+.15,.34,h,.28,mats.stone);box(f,'Pier bronze inlay',x,h/2,D+.3,.055,h-.15,.025,exteriorMats.bronze)}
  for(const x of [EX+.2,12.72,W-.2])box(f,'Entrance stone pier',x,h/2,D+E+.15,.34,h,.28,mats.stone);
  for(let z=D+.3;z<D+E-.15;z+=.24)box(f,'Vertical bronze screen',EX-.17,h/2,z,.16,h-.3,.065,exteriorMats.bronze);
  // The canopy is carried by two columns, with a clear approach between them.
@@ -99,58 +96,6 @@ function banquetFacade(g,level,h){
  }
 }
 
-function buildFloorB(g,level,h){
- wall(g,'Plan B rear exterior','x',0,W,0,h,[{a:.65,b:2.1,window:true},{a:3.5,b:5,window:true,tall:true},{a:6,b:9.8,window:true,tall:true},{a:11.6,b:13.6,window:true,tall:true},level?{a:14.3,b:16.1,window:true,tall:true}:{a:14.3,b:16.1,door:true,glazed:true}],true);
- wall(g,'Plan B service exterior','z',0,D,0,h,[{a:.7,b:2.5,window:true},{a:4.25,b:5.15,window:true,sill:1.8,head:2.4},{a:6.25,b:7.15,window:true,sill:1.8,head:2.4},{a:9.65,b:10.65,window:true},{a:12,b:13.3,window:true}],true,true);
- wall(g,'Plan B right exterior','z',0,D+E,W,h,[{a:.7,b:3.7,window:true,tall:true},{a:4.9,b:8.5,window:true,tall:true},{a:9.65,b:13.25,window:true,tall:true},{a:14.6,b:17.7,window:true,tall:true}],true);
- wall(g,'Plan B front room facade','x',0,EX,D,h,[{a:.65,b:5.7,window:true,tall:true},{a:6.7,b:8.1,window:true,tall:true}],true,true);
- wall(g,'Plan B front room / lobby','x',EX,9.425,D,h,[],false,true);
- wall(g,level?'First-floor landing entry':'Plan B hall / lobby','x',9.425,W,D,h,[{a:12.7,b:14.4,door:level===1,inward:true}],false,true);
- wall(g,level?'First-floor front window':'Entrance front','x',EX,W,D+E,h,[{a:9.1,b:12.25,window:true,tall:true},level?{a:14.2,b:15.9,window:true,tall:true}:{a:14.2,b:15.9,door:true,glazed:true}],true,true);
- wall(g,'Entrance left','z',D,D+E,EX,h,[],true,true);
- for(const [name,axis,a,b,c,openings] of planBPartitions())wall(g,'Plan B '+name,axis,a,b,c,h,openings,false,true);
- for(const [x,z] of columnPoints())box(g,'Column',x,h/2,z,columnSize(),h,columnSize(),mats.stone);
- for(const x of [EX+.11,12.72,W-.11])box(g,'Entrance column',x,h/2,D+E-.11,.28,h,.28,mats.stone);
- const st=plan.stair;
- if(!level)stairs(g,st.x,st.z,st.width,st.depth,state.height,'Front stair');
- else{rail(g,st.x,st.z,st.x,st.z+st.depth,0,0);rail(g,st.x+st.width,st.z,st.x+st.width,st.z+st.depth,0,0);rail(g,st.x,st.z,st.x+st.width,st.z,0,0);}
- banquetFacade(g,level,h);
- const f=new THREE.Group();f.name='Plan B fixtures';f.userData.kind='fixtures';g.add(f);g.userData.fixtures=f;
- for(const [x,z] of [[.674,4.4],[2.033,4.4],[.674,6.37]])toilet(f,x,z);
- // The 2x2 block's fourth cell is an inferred lobby, so it gets service fittings, not a WC.
- box(f,'Cleaner sink',2.45,.5,6.2,.44,.3,.44,mats.sanitary,'furniture');box(f,'Cleaner sink tap',2.45,.78,6.02,.03,.22,.03,mats.metal,'furniture');box(f,'WC lobby floor drain',1.75,.02,7.3,.3,.04,.3,mats.metal,'furniture');
- for(const x of [.65,1.4,2.15]){box(f,'Urinal fixture',x,.72,8.15,.4,.65,.32,mats.sanitary,'furniture');box(f,'Urinal drain',x,.04,8.3,.3,.08,.3,mats.metal,'furniture')}
- box(f,'Hand-wash rear cabinet',1.5,.4,9.62,2.3,.8,.42,mats.wood,'furniture');box(f,'Hand-wash rear counter',1.5,.85,9.62,2.4,.1,.5,mats.stone,'furniture');
- box(f,'Hand-wash side cabinet',.48,.4,10.5,.42,.8,1.3,mats.wood,'furniture');box(f,'Hand-wash side counter',.48,.85,10.5,.5,.1,1.4,mats.stone,'furniture');
- for(const x of [.8,1.55,2.3]){box(f,'Hand-wash basin',x,.94,9.64,.45,.08,.35,mats.sanitary,'furniture');box(f,'Hand-wash tap',x,1.08,9.48,.035,.25,.035,mats.metal,'furniture')}
- box(f,'Hand-wash basin',.48,.94,10.6,.35,.08,.45,mats.sanitary,'furniture');
- // Plan B gets the same illustrative banquet layer as Plan A, so the toggle is never dead.
- benches(f,[8.37,13.87],[2.35,7,10.5]);deskSet(f,1.28,.9);diningTable(f,3,12.6);diningTable(f,7.7,12.6);
- label(g,'PLAN B · MAIN HALL',9,.16,7,'room',level?'FIRST FLOOR · ASSUMED REPEAT':'54′1″ × 34′6″ · PRINTED LABEL','',0);
- label(g,'REAR ROOM',1.3532,.16,1.9);label(g,'WC × 3',1.4,.16,4.9);label(g,'WC LOBBY',2.03,.16,6.9);label(g,'URINAL',1.5,.16,8.6);label(g,'HAND WASH',1.5,.16,10.5);label(g,'FRONT ROOM 1',3.3,.16,12.7);label(g,'FRONT ROOM 2',7.75,.16,12.7);label(g,level?'STAIR LANDING':'ENTRY',14.6,.16,16.6,'room','',1);
-}
-
-function svgPlanB(highlight=''){
- const floor=state.floor==='1'?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR';
- const parts=[];
- const rect=(x,z,w,d,fill)=>`<rect x="${x}" y="${z}" width="${w}" height="${d}" fill="${fill}"/>`;
- const text=(x,z,value,size=.23)=>svgText(x,z,value,size,'#365346');
- const zone=(id,x,z,w,d,fill)=>parts.push(rect(x,z,w,d,highlight===id?'#c0dcb3':fill));
- parts.push(`<path d="M0 0H${W}V${D+E}H${EX}V${D}H0Z" fill="#f7f4e9" stroke="#3f5747" stroke-width=".16"/>`);
- zone('hall',2.9,.15,W-3.05,11.25,'#f4f2e5');zone('roomA',.064,.064,2.4384,3.6576,'#e2e9d8');
- for(const [x,z] of [[.064,3.8616],[1.4232,3.8616],[.064,5.8304]])parts.push(rect(x,z,1.2192,1.8288,'#ccded3'));
- zone('wash',.16,7.7292,2.65,1.52,'#d9e5d7');zone('wash',.16,9.2408,2.65,2.151,'#e1ead8');
- zone('frontA',.064,11.437,6,2.45,'#e2e9d8');zone('frontB',6.204,11.437,3.151,2.45,'#e2e9d8');
- const st=plan.stair,bsm=stairMetrics(st.depth,state.height);zone('stair',EX+.13,D+.13,W-EX-.26,E-.26,'#e7e8d9');parts.push(rect(st.x,st.z,st.width,st.depth,bsm.going<TARGET_GOING?'#efdcc0':'#cdd5c8'));
- for(let i=0;i<bsm.perFlight;i++)parts.push(`<path d="M${st.x} ${st.z+.88+i*(st.depth-.88)/bsm.perFlight}h${st.width}" stroke="#71836b" stroke-width=".035"/>`);
- parts.push(`<path d="M${st.x+st.width/2} ${st.z+.88}v${st.depth-.88}" stroke="#71836b" stroke-width=".05"/>`);
- for(const c of colliders.filter(c=>c.floor===(state.floor==='1'?1:0)&&c.yMin<.1&&c.yMax>2))parts.push(rect(c.axis==='x'?c.a:c.c-c.thick/2,c.axis==='x'?c.c-c.thick/2:c.a,c.axis==='x'?c.b-c.a:c.thick,c.axis==='x'?c.thick:c.b-c.a,'#536556'));
- for(const [x,z] of columnPoints())parts.push(rect(x-columnSize()/2,z-columnSize()/2,columnSize(),columnSize(),'#344d3e'));
- parts.push(text(9,6.4,'PLAN B · MAIN HALL',.4),text(9,7,'54′1″ × 34′6″ · printed label',.25),text(9,7.5,floor,.22),text(1.3532,1.65,'ROOM',.28),text(1.3532,2.1,'8′ × 12′',.23),text(.674,4.7,'TOI'),text(2.033,4.7,'TOI (L)'),text(.674,6.67,'TOI (G)'),text(2.033,6.6,'WC LOBBY',.18),text(2.033,6.86,'inferred',.15),text(1.3532,8.5,'URINAL'),text(1.3532,8.9,'8′ × 4′6″',.18),text(1.3532,10.25,'HAND WASH'),text(1.3532,10.7,'8′5″ × 6′7″',.18),text(3.2,12.4,'FRONT ROOM 1',.28),text(3.2,12.85,'6.000 × 2.450 m · use unspecified',.19),text(7.8,12.4,'FRONT ROOM 2',.25),text(7.8,12.85,'use unspecified',.18),text(14.6,16.1,state.floor==='1'?'STAIR LANDING':'ENTRANCE',.28),text(14.6,16.6,'4.600 m projection *',.2));
- const notes=['* Projection conflicts: right 4.600 m / left 3.7226 m (12′2½″). Verify on site.','* Upper floor assumed to repeat; single stair and no lift are unresolved design questions.'];
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 23 26" role="img" aria-label="Plan B drawing 218124 ${floor.toLowerCase()}"><rect x="-3" y="-3" width="23" height="26" fill="#fafbf5"/>${parts.join('')}${svgOpenings()}${svgAnnotations(floor,notes)}</svg>`;
-}
-
 function fillList(id,items){const el=$(id);el.textContent='';for(const text of items){const li=document.createElement('li');li.textContent=text;el.append(li)}}
 function fillRows(id,rows){const el=$(id);el.textContent='';for(const [k,v] of rows){const tr=document.createElement('tr');for(const value of [k,v]){const td=document.createElement('td');td.textContent=value;tr.append(td)}el.append(tr)}}
 function stairReview(){const st=plan.stair,sm=stairMetrics(st.depth,state.height);
@@ -159,7 +104,7 @@ function stairReview(){const st=plan.stair,sm=stairMetrics(st.depth,state.height
   status:'Concept only. Risers are capped at 190 mm by raising the riser count; the going is limited by the drawn well depth and cannot be fixed without redesign. Verify treads, risers, headroom, handrails, accessibility and evacuation with an architect.'}}
 function refreshPlanUI(){
  $('planSelect').value=plan.id;$('projectDrawing').textContent=plan.name+' · Drawing '+plan.drawing+' · G + 1';
- $('planDescription').textContent=plan.id==='B'?'Left service strip · two front rooms · one stair':'Rear service rooms · twin stairs';
+ $('planDescription').textContent=plan.tagline;
  // Built as DOM rather than innerHTML: plan data is trusted today, but the CSP
  // and this code should not depend on that staying true.
  const list=$('roomList');list.textContent='';
@@ -170,7 +115,7 @@ function refreshPlanUI(){
  $('sourceDrawingTitle').textContent=plan.name+' · drawing '+plan.drawing;
  $('sourcePreview').hidden=!drawingURLs[plan.id];$('sourcePreview').src=drawingURLs[plan.id]||'';$('sourceUpload').value='';
  $('sourcePrivacy').textContent='Open drawing '+plan.drawing+' from your device. It stays local and is associated only with '+plan.name+'.';
- $('spaceTitle').textContent=plan.name+' · A place to celebrate.';$('spaceDesc').textContent=plan.id==='B'?'A new layout with left-side services, two front rooms and a single stair. The front projection needs confirmation.':'Tall glass, warm ivory stone and a planted garden. Explore the original banquet layout.';
+ $('spaceTitle').textContent=plan.name+' · A place to celebrate.';$('spaceDesc').textContent=plan.blurb;
  $('statOne').style.fontSize='';$('statTwo').style.fontSize='';$('statOne').textContent='2';$('statOneLabel').textContent='FLOORS';$('statTwo').textContent=W.toFixed(2)+' m';$('statTwoLabel').textContent='BLOCK WIDTH';$('enter').dataset.room='hall';$('enter').textContent='Enter hall ↗';
  $('exportDescription').textContent='Export '+plan.name+' · drawing '+plan.drawing+'. All exports use the selected plan.';
 }
@@ -186,25 +131,20 @@ function switchPlan(id,persist=true){
 
 function build(){cutMaterials.forEach(m=>m.dispose());cutMaterials=[];model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.isLine)o.material.dispose()});model.clear();floors=[];colliders=[];openingsDrawn=[];furnitureObstacles=[];modelObjects=[];labelDefs.forEach(l=>l.el.remove());labelDefs=[];const h=state.height-SLAB;
 for(let level=0;level<2;level++){const g=new THREE.Group();g.name=level?'First floor (assumed repeat)':'Ground floor';g.userData.level=level;model.add(g);floors.push(g);slab(g,0,level===1);
-if(plan.id==='B'){buildFloorB(g,level,h)}else{
-wall(g,'Rear exterior','x',0,W,0,h,[{a:.9,b:2.5,window:true},{a:5.7,b:7.3,window:true},level?{a:14.1,b:15.8,window:true}:{a:15.3,b:16.5,door:true,glazed:true}],true);
-wall(g,'Left exterior','z',0,D,0,h,[{a:4.8,b:6.5,window:true,tall:true},{a:8.1,b:9.8,window:true,tall:true},{a:11.2,b:12.8,window:true,tall:true}],true,true);
-wall(g,'Right exterior','z',0,D+E,W,h,[{a:4.8,b:6.5,window:true,tall:true},{a:8.1,b:9.8,window:true,tall:true},{a:11.2,b:12.8,window:true,tall:true},{a:14.8,b:16.4,window:true,tall:true}],true);
-wall(g,'Hall front left','x',0,EX,D,h,[{a:.65,b:4.4,window:true,tall:true},{a:5.25,b:7.85,window:true,tall:true}],true,true);wall(g,level?'First-floor landing entry':'Hall front / entry to lobby','x',EX,W,D,h,[{a:11.2,b:12.9,door:level===1,inward:true}],false,true);
-wall(g,level?'First-floor front window':'Entrance front','x',EX,W,D+E,h,[{a:9.1,b:12.25,window:true,tall:true},level?{a:13.65,b:15.35,window:true,tall:true}:{a:13.65,b:15.35,door:true,glazed:true}],true,true);wall(g,'Entrance left','z',D,D+E,EX,h,[],true,true);
-// Stepped left WC block set out from printed clear dimensions, shared with the 2D plan.
-for(const [name,axis,a,b,c,openings] of planAPartitions())wall(g,name,axis,a,b,c,h,openings,false,true);
-// Column positions trace the visible rectangular marks in the plan.
-for(const [x,z] of columnPoints())box(g,'Column',x,h/2,z,columnSize(),h,columnSize(),mats.stone);for(const x of [EX+.1,12.72,W-.11])box(g,'Entrance column',x,h/2,D+E-.11,.28,h,.28,mats.stone);
-if(level===0){rearStairs(g,state.height);stairs(g,8.9,D+.18,2.18,2.6,state.height,'Front stair')}if(level===1){rail(g,8.9,D+.18,8.9,D+2.78,0,0);rail(g,11.08,D+.18,11.08,D+2.78,0,0);rail(g,8.9,D+.18,11.08,D+.18,0,0);rail(g,11.65,.25,11.65,3.35,0,0);rail(g,12.9,1.5,15.2,1.5,0,0);}
+// One renderer, driven by the plan descriptors in plans.js, so an alternative
+// is a data entry instead of a second code path.
+for(const [name,axis,a,b,c,openings,outer,cut] of planShell(plan,level))wall(g,name,axis,a,b,c,h,openings,outer,cut);
+for(const [x,z] of columnPoints())box(g,'Column',x,h/2,z,columnSize(),h,columnSize(),mats.stone);
+for(const x of [EX+.11,12.72,W-.11])box(g,'Entrance column',x,h/2,D+E-.11,.28,h,.28,mats.stone);
+const st=plan.stair;
+if(level===0){if(plan.rearStair)rearStairs(g,state.height);stairs(g,st.x,st.z,st.width,st.depth,state.height,'Front stair')}
+else for(const [x1,z1,x2,z2] of planRails(plan))rail(g,x1,z1,x2,z2,0,0);
 banquetFacade(g,level,h);
-const fg=furniture(g);g.userData.fixtures=fg;
-label(g,'MAIN HALL',8.2,.16,8,'room',level?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR · 54′1″ × 34′6″ LABEL','',0);label(g,'ROOM A',(planAGrid.outerFace+planAGrid.roomAWall)/2,.16,1.9);label(g,'ROOM B',(planAGrid.leftWcWall+planAGrid.roomBWall)/2,.16,1.9);label(g,'WD. PASS.',(planAGrid.passageStart+planAGrid.passageEnd)/2,.16,1.4);label(g,'BASIN & URINAL',(planAGrid.passageStart+planAGrid.washWall)/2,.16,2.9);label(g,level?'STAIR LANDING':'ENTRY',14.3,.16,15.8,'room','',1);
-}
+g.userData.fixtures=buildFixtures(g);
+for(const [text,x,z,kind='room',sub='',priority=2] of planLabels(plan,level))label(g,text,x,.16,z,kind,sub,priority);
 const fit=new THREE.Group();fit.userData.cut=true;g.add(fit);for(const [x,z] of hallLightPoints())box(fit,'Ceiling light fitting',x,h-.05,z,.7,.1,.7,exteriorMats.glow,'fixture');
 const clipPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),1.15);g.userData.cutPlane=clipPlane;const variants=new Map();g.traverse(o=>{if(!o.isMesh)return;let parent=o.parent,cut=false;while(parent&&parent!==g){cut ||= !!parent.userData.cut;parent=parent.parent}if(cut){const original=o.material;let variant=variants.get(original);if(!variant){variant=original.clone();variant.clippingPlanes=[globalClip,clipPlane];variant.clipShadows=true;variants.set(original,variant);cutMaterials.push(variant)}o.userData.fullMaterial=original;o.userData.cutMaterial=variant;}});
 }
-ceilingGroup.traverse(o=>o.geometry?.dispose());ceilingGroup.clear();slab(ceilingGroup,state.height,true);
 roofGroup.traverse(o=>o.geometry?.dispose());roofGroup.clear();slab(roofGroup,0,false,true);for(const [a,b,c,axis] of [[0,W,0,'x'],[0,D,0,'z'],[0,D+E,W,'z'],[0,EX,D,'x'],[EX,W,D+E,'x'],[D,D+E,EX,'z']]){box(roofGroup,'Roof parapet',axis==='x'?(a+b)/2:c,.4,axis==='x'?c:(a+b)/2,axis==='x'?b-a:.14,.8,axis==='x'?.14:b-a,mats.wall)}model.add(roofGroup);
 // One annotation layer for the whole model, not a copy per storey, drawn as an
 // overlay so a dimension line and its value are never separated.
@@ -215,8 +155,8 @@ label(dimGroup,W.toFixed(3)+' m overall width',W/2,.08,-1.05,'dim','',3);
 dim([[-1,.04,0],[-1,.04,D]]);for(const z of [0,D])dim([[-.75,.04,z],[-1.25,.04,z]]);
 label(dimGroup,D.toFixed(3)+' m block depth',-1.1,.08,D/2,'dim','',3);
 dim([[W+1,.04,D],[W+1,.04,D+E]]);for(const z of [D,D+E])dim([[W+.75,.04,z],[W+1.25,.04,z]]);
-label(dimGroup,E.toFixed(4)+' m projection'+(plan.id==='B'?' *':''),W+1.35,.08,D+E/2,'dim','',3);
-const rearZ=plan.id==='B'?.125:.11,bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
+label(dimGroup,E.toFixed(4)+' m projection'+(plan.projectionProvisional?' *':''),W+1.35,.08,D+E/2,'dim','',3);
+const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
 for(let i=0;i<bays.length-1;i++){dim([[bays[i],.04,-2],[bays[i+1],.04,-2]]);for(const x of [bays[i],bays[i+1]])dim([[x,.04,-1.8],[x,.04,-2.2]]);label(dimGroup,(bays[i+1]-bays[i]).toFixed(3),(bays[i]+bays[i+1])/2,.08,-2.05,'dim','',4)}
 buildSite();update();}
 // Landscape is an illustrative proposal, not a surveyed site boundary.
@@ -243,25 +183,43 @@ for(const [x,z] of [[plan.entryCenter-1.4,D+E+.8],[plan.entryCenter+1.5,D+E+.8],
 }
 const grid=new THREE.GridHelper(50,50,0x9aa58f,0xc3ccba);grid.position.set(W/2,.018,8.8);scene.add(grid);
 const measureGroup=new THREE.Group();scene.add(measureGroup);
-let measureActive=false,measurePoints=[],walkYaw=0,walkPitch=0,drag=null,lastTime=performance.now();const keys=new Set();
+let measureActive=false,measurePoints=[],walkYaw=0,walkPitch=0,walkY=0,drag=null,lastTime=performance.now();const keys=new Set();
 const drawer=setupDrawer({onPause:()=>{keys.clear();drag=null;controls.autoRotate=false;$('rotate').classList.remove('active')}});
-function update(){$('main').dataset.mode=state.mode;$('labelLayer').hidden=state.mode==='plan'||state.mode==='walk';site.visible=state.mode!=='plan'&&state.floor!=='1';ceilingGroup.visible=state.mode==='walk'&&state.floor==='0';
+function update(){$('main').dataset.mode=state.mode;$('labelLayer').hidden=state.mode==='plan'||state.mode==='walk';site.visible=state.mode!=='plan'&&state.floor!=='1';
 // Style/cutaway sync happens in one traversal per storey, not two.
 materials.forEach(m=>{m.wireframe=state.style==='wire';m.color.copy(state.style==='clay'?new THREE.Color(0xf1f0e9):m.userData.base);m.map=m===mats.floor&&state.style==='material'?floorTexture:null;m.needsUpdate=true});
-floors.forEach((g,i)=>{g.position.y=i*(state.height+explodedOffset());g.userData.cutPlane.constant=g.position.y+1.15;g.visible=state.floor==='both'||state.floor===String(i);g.userData.fixtures.visible=state.furniture;g.traverse(o=>{if(o.isMesh&&o.userData.fullMaterial){o.visible=true;const original=o.userData.fullMaterial,variant=o.userData.cutMaterial;variant.color.copy(original.color);variant.map=original.map;variant.wireframe=original.wireframe;variant.needsUpdate=true;o.material=state.mode==='cutaway'?variant:original;}})});
+floors.forEach((g,i)=>{g.position.y=i*(state.height+explodedOffset());g.userData.cutPlane.constant=g.position.y+1.15;g.visible=state.mode==='walk'||state.floor==='both'||state.floor===String(i);g.userData.fixtures.visible=state.furniture;g.traverse(o=>{if(o.isMesh&&o.userData.fullMaterial){o.visible=true;const original=o.userData.fullMaterial,variant=o.userData.cutMaterial;variant.color.copy(original.color);variant.map=original.map;variant.wireframe=original.wireframe;variant.needsUpdate=true;o.material=state.mode==='cutaway'?variant:original;}})});
 dimGroup.visible=state.dimensions&&state.mode!=='plan'&&state.mode!=='walk';
 const lit=state.light==='evening'?17:state.mode==='walk'?6:0,litY=(state.floor==='1'?state.height+explodedOffset():0)+state.height-.45;
 hallLightPoints().forEach(([x,z],i)=>{interiorLights[i].position.set(x,litY,z);interiorLights[i].intensity=state.mode==='plan'?0:lit});
-roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&state.floor!=='0'&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='Front stair: '+Math.round(sr.rise*1000)+' mm rise / '+Math.round(sr.tread*1000)+' mm going · '+sr.upperLandingClear.toFixed(2)+' m upper landing. '+(sr.shortfall>.01?'Well is '+sr.shortfall.toFixed(2)+' m too shallow for a '+Math.round(TARGET_GOING*1000)+' mm going — treads shown in amber are diagrammatic.':'Meets the '+Math.round(TARGET_GOING*1000)+' mm going target; headroom and width still need review.');$('stairReview').classList.toggle('warn',sr.shortfall>.01);$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
+roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&(state.mode==='walk'||state.floor!=='0')&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='Front stair: '+Math.round(sr.rise*1000)+' mm rise / '+Math.round(sr.tread*1000)+' mm going · '+sr.upperLandingClear.toFixed(2)+' m upper landing. '+(sr.shortfall>.01?'Well is '+sr.shortfall.toFixed(2)+' m too shallow for a '+Math.round(TARGET_GOING*1000)+' mm going — treads shown in amber are diagrammatic.':'Meets the '+Math.round(TARGET_GOING*1000)+' mm going target; headroom and width still need review.');$('stairReview').classList.toggle('warn',sr.shortfall>.01);$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
 // Room labels only read inside the cutaway, so the toggle says so instead of doing nothing.
 $('labels').disabled=state.mode!=='cutaway';$('dimensions').disabled=state.mode==='plan'||state.mode==='walk';
-for(const id of ['bird','top','front','rotate'])$(id).disabled=!webglAvailable;document.querySelectorAll('[data-mode]').forEach(b=>{b.disabled=!webglAvailable&&b.dataset.mode!=='plan';b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode))});document.querySelectorAll('[data-floor]').forEach(b=>{b.disabled=state.mode==='plan'&&b.dataset.floor==='both';b.setAttribute('aria-pressed',String(b.dataset.floor===state.floor))});$('viewChip').innerHTML='<i></i>'+(!webglAvailable?'2D · NO WEBGL':({walk:'INTERIOR',plan:'2D PLAN',cutaway:explodedOffset()>0?'EXPLODED VIEW':state.floor==='both'?'ASSEMBLED 3D':'ISOLATED FLOOR',exterior:'ASSEMBLED 3D'}[state.mode]));$('viewTitle').textContent={cutaway:'A new perspective.',exterior:'Outside, all around.',walk:'Step into the space.',plan:'Every line has a place.'}[state.mode];$('interactionHint').textContent=!webglAvailable?'2D fallback · drag to pan · pinch / + − to zoom':state.mode==='walk'?(touchDevice?'Drag to look · Hold arrows to walk':'Drag to look · WASD to move'):state.mode==='plan'?'Drag to pan · pinch / scroll / + − to zoom · Fit to reset':(touchDevice?'Drag to orbit · Pinch to zoom':'Drag to orbit · Scroll to zoom · Right-drag to pan');document.querySelector('.walk-hint').textContent=touchDevice?'Drag to look · Hold arrows to walk. Change floors in Controls.':'Drag to look · WASD / arrows to move · switch floors with Ground / First';$('compass').hidden=state.mode==='walk';$('spaceCard').style.display=state.mode==='plan'?'none':'';if(state.mode==='plan')renderPlan();invalidate();syncURL();}
+for(const id of ['bird','top','front','rotate'])$(id).disabled=!webglAvailable;document.querySelectorAll('[data-mode]').forEach(b=>{b.disabled=!webglAvailable&&b.dataset.mode!=='plan';b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode))});document.querySelectorAll('[data-floor]').forEach(b=>{b.disabled=state.mode==='plan'&&b.dataset.floor==='both';b.setAttribute('aria-pressed',String(b.dataset.floor===state.floor))});$('viewChip').innerHTML='<i></i>'+(!webglAvailable?'2D · NO WEBGL':({walk:'INTERIOR',plan:'2D PLAN',cutaway:explodedOffset()>0?'EXPLODED VIEW':state.floor==='both'?'ASSEMBLED 3D':'ISOLATED FLOOR',exterior:'ASSEMBLED 3D'}[state.mode]));$('viewTitle').textContent={cutaway:'A new perspective.',exterior:'Outside, all around.',walk:'Step into the space.',plan:'Every line has a place.'}[state.mode];$('interactionHint').textContent=!webglAvailable?'2D fallback · drag to pan · pinch / + − to zoom':state.mode==='walk'?(touchDevice?'Drag to look · Hold arrows to walk':'Drag to look · WASD to move'):state.mode==='plan'?'Drag to pan · pinch / scroll / + − to zoom · Fit to reset':(touchDevice?'Drag to orbit · Pinch to zoom':'Drag to orbit · Scroll to zoom · Right-drag to pan');document.querySelector('.walk-hint').textContent=touchDevice?'Drag to look · Hold arrows to walk · the stairs carry you between floors':'Drag to look · WASD / arrows to move · Q and E turn · walk up the stairs to change floor';$('compass').hidden=state.mode==='walk';$('spaceCard').style.display=state.mode==='plan'?'none':'';if(state.mode==='plan')renderPlan();invalidate();syncURL();}
 function explodedOffset(){return state.mode==='cutaway'&&state.floor==='both'?state.explode:0}
 function floorY(){return state.floor==='1'?state.height:0}
-function view(pos,target,orthographic=false){ortho.zoom=1;orthoMode=orthographic;activeCamera=orthographic?ortho:camera;controls.enabled=!orthographic&&state.mode!=='walk';camera.position.set(...pos);controls.target.set(...target);camera.lookAt(...target);ortho.position.set(...pos);ortho.lookAt(...target);resize();invalidate()}
-function bird(){if(!webglAvailable){setMode('plan');return}if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');const y=state.floor==='1'?state.height+explodedOffset():2;view([30,29,36],[W/2,y,8.1]);}
-function setMode(mode){if(!webglAvailable&&mode!=='plan'){toast('3D requires WebGL. This browser can use the 2D plan and all model exports.');mode='plan'}state.mode=mode;keys.clear();clearMeasure();canvas.style.cursor='';measureActive=false;$('measure').classList.remove('active');$('measureInfo').hidden=true;controls.autoRotate=false;$('rotate').classList.remove('active');if(mode==='exterior'){state.roof=true;$('roof').checked=true;state.explode=0;$('explode').value=0;state.floor='both';state.section=100;$('section').value=100;view([31,15,39],[W/2,2.3,10])}if(mode==='cutaway'){state.roof=false;$('roof').checked=false;view([29,28,36],[W/2,2.5,8.4])}if(mode==='walk'){state.floor=state.floor==='1'?'1':'0';state.explode=0;$('explode').value=0;state.roof=true;$('roof').checked=true;state.section=100;$('section').value=100;view([rooms.hall.x,floorY()+1.65,rooms.hall.z],[rooms.hall.x,floorY()+1.65,3]);walkYaw=0;walkPitch=0;controls.enabled=false}if(mode==='plan'){state.floor=state.floor==='both'?'0':state.floor;controls.enabled=false}update();drawer.close()}
-function focusRoom(id){const r=rooms[id];if(!r)return;selectedRoom=id;$('spaceTitle').textContent=r.title;$('spaceDesc').textContent=r.desc;$('statOne').textContent=r.size;$('statOne').style.fontSize='11px';$('statOneLabel').textContent='PLAN READING';$('statTwo').textContent=r.area;$('statTwo').style.fontSize='11px';$('statTwoLabel').textContent=id==='wash'?(plan.id==='A'?'PASSAGE WIDTH':'SERVICE ZONES'):id==='stair'?'LEVELS':'DRAWING AREA';$('enter').textContent='Step inside ↗';$('enter').dataset.room=id;document.querySelectorAll('[data-room]').forEach(b=>b.classList.toggle('active',b.dataset.room===id));if(state.mode==='walk'){const target=safeWalkTarget(r);camera.position.set(target.x,floorY()+1.65,target.z);walkYaw=id==='hall'?0:Math.PI;walkPitch=0}else if(state.mode!=='plan'){const y=state.floor==='0'?0:state.height+explodedOffset();view([r.x+9,y+12,r.z+11],[r.x,y+1,r.z])}else{renderPlan(id)}drawer.close()}
+// Camera presets are fitted to the model instead of trusting hand-placed
+// coordinates. On a 390-wide portrait viewport the fixed positions sat about a
+// quarter too far back, which is where the dead space above and below came from.
+const fitSphere=new THREE.Sphere(),fitBox=new THREE.Box3();
+function frameRadius(includeSite=false){
+ fitBox.setFromCenterAndSize(new THREE.Vector3(W/2,(state.height*2+.8)/2,(D+E)/2),new THREE.Vector3(W,state.height*2+.8,D+E));
+ if(includeSite)fitBox.expandByScalar(3);
+ return fitBox.getBoundingSphere(fitSphere).radius;
+}
+function fitDistance(radius){const v=camera.fov*Math.PI/180,h=2*Math.atan(Math.tan(v/2)*Math.max(.1,camera.aspect));return radius*1.05/Math.sin(Math.max(.05,Math.min(v,h))/2)}
+let autoFit=null,fitting=false;
+function placeView({pos,target,fitRadius}){
+ let p=new THREE.Vector3(...pos);
+ if(fitRadius>0){const t=new THREE.Vector3(...target);p=t.clone().add(p.clone().sub(t).normalize().multiplyScalar(fitDistance(fitRadius)))}
+ camera.position.copy(p);controls.target.set(...target);camera.lookAt(...target);ortho.position.copy(p);ortho.lookAt(...target);
+}
+function view(pos,target,orthographic=false,fitRadius=0){ortho.zoom=1;orthoMode=orthographic;activeCamera=orthographic?ortho:camera;controls.enabled=!orthographic&&state.mode!=='walk';
+ autoFit=fitRadius>0&&!orthographic?{pos:[...pos],target:[...target],fitRadius}:null;
+ resize();if(!autoFit)placeView({pos,target,fitRadius:0});invalidate()}
+function bird(){if(!webglAvailable){setMode('plan');return}if(state.mode==='walk'||state.mode==='plan')setMode('cutaway');const y=state.floor==='1'?state.height+explodedOffset():2;view([30,29,36],[W/2,y,8.1],false,frameRadius());}
+function setMode(mode){if(!webglAvailable&&mode!=='plan'){toast('3D requires WebGL. This browser can use the 2D plan and all model exports.');mode='plan'}state.mode=mode;keys.clear();clearMeasure();canvas.style.cursor='';measureActive=false;$('measure').classList.remove('active');$('measureInfo').hidden=true;controls.autoRotate=false;$('rotate').classList.remove('active');if(mode==='exterior'){state.roof=true;$('roof').checked=true;state.explode=0;$('explode').value=0;state.floor='both';state.section=100;$('section').value=100;view([31,15,39],[W/2,2.3,10],false,frameRadius(true))}if(mode==='cutaway'){state.roof=false;$('roof').checked=false;view([29,28,36],[W/2,2.5,8.4],false,frameRadius())}if(mode==='walk'){state.floor=state.floor==='1'?'1':'0';state.explode=0;$('explode').value=0;state.roof=true;$('roof').checked=true;state.section=100;$('section').value=100;walkY=floorY();view([rooms.hall.x,floorY()+1.65,rooms.hall.z],[rooms.hall.x,floorY()+1.65,3]);walkYaw=0;walkPitch=0;controls.enabled=false}if(mode==='plan'){state.floor=state.floor==='both'?'0':state.floor;controls.enabled=false}update();drawer.close()}
+function focusRoom(id){const r=rooms[id];if(!r)return;selectedRoom=id;$('spaceTitle').textContent=r.title;$('spaceDesc').textContent=r.desc;$('statOne').textContent=r.size;$('statOne').style.fontSize='11px';$('statOneLabel').textContent='PLAN READING';$('statTwo').textContent=r.area;$('statTwo').style.fontSize='11px';$('statTwoLabel').textContent=r.areaLabel||'DRAWING AREA';$('enter').textContent='Step inside ↗';$('enter').dataset.room=id;document.querySelectorAll('[data-room]').forEach(b=>b.classList.toggle('active',b.dataset.room===id));if(state.mode==='walk'){const target=safeWalkTarget(r);camera.position.set(target.x,floorY()+1.65,target.z);walkYaw=id==='hall'?0:Math.PI;walkPitch=0}else if(state.mode!=='plan'){const y=state.floor==='0'?0:state.height+explodedOffset();view([r.x+9,y+12,r.z+11],[r.x,y+1,r.z],false,6.5)}else{renderPlan(id)}drawer.close()}
 function clearMeasure(){measurePoints=[];if(measureActive)$('measureInfo').textContent='Click two points on any visible surface to measure.';measureGroup.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});measureGroup.clear()}
 function formatDistance(v){if(state.units==='m')return v.toFixed(2)+' m';const total=Math.round(v/.0254);return Math.floor(total/12)+'′ '+total%12+'″'}
 function download(name,data,type){const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
@@ -276,9 +234,9 @@ function svgAnnotations(floorLabel,footnotes=[]){
  line(`M-1 0V${D}M-1.25 0h.5M-1.25 ${D}h.5`);
  a.push(`<text x="-1.32" y="${D/2}" transform="rotate(-90 -1.32 ${D/2})" text-anchor="middle" font-size=".25" fill="#5d7059" font-family="Arial,sans-serif">${D.toFixed(3)} m printed block depth</text>`);
  line(`M${W+1} ${D}V${D+E}M${W+.75} ${D}h.5M${W+.75} ${D+E}h.5`);
- a.push(`<text x="${W+1.32}" y="${D+E/2}" transform="rotate(-90 ${W+1.32} ${D+E/2})" text-anchor="middle" font-size=".24" fill="#5d7059" font-family="Arial,sans-serif">${E.toFixed(4)} m projection${plan.id==='B'?' *':''}</text>`);
+ a.push(`<text x="${W+1.32}" y="${D+E/2}" transform="rotate(-90 ${W+1.32} ${D+E/2})" text-anchor="middle" font-size=".24" fill="#5d7059" font-family="Arial,sans-serif">${E.toFixed(4)} m projection${plan.projectionProvisional?' *':''}</text>`);
  // Bay chain traced from the same column grid the 3D model uses.
- const rearZ=plan.id==='B'?.125:.11,bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((x,y)=>x-y);
+ const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((x,y)=>x-y);
  for(let i=0;i<bays.length-1;i++){line(`M${bays[i]} -2H${bays[i+1]}M${bays[i]} -1.82V-2.18M${bays[i+1]} -1.82V-2.18`,.025);t((bays[i]+bays[i+1])/2,-2.26,(bays[i+1]-bays[i]).toFixed(3),.21)}
  t(-2.3,-2.26,'BAYS',.19,'#8b9a86','start');
  // North arrow: the drawing gives no true north, so it is labelled as drawing-up.
@@ -299,30 +257,30 @@ function svgAnnotations(floorLabel,footnotes=[]){
  footnotes.forEach((note,i)=>t(7.3,ty+2.22+i*.3,note,.19,'#8a6a3c','start'));
  return a.join('');
 }
-function svgPlan(highlight=''){if(plan.id==='B')return svgPlanB(highlight);const floor=state.floor==='1'?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR';const paths=[];const q=planAGrid;function rect(x,z,w,d,fill,stroke='#536c5a',sw=.035){return `<rect x="${x}" y="${z}" width="${w}" height="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`}const txt=(x,z,s,size=.23,color='#42604a')=>svgText(x,z,s,size,color);
-paths.push(`<path d="M0 0H${W}V${D+E}H${EX}V${D}H0Z" fill="#f8f7ec" stroke="#3f5747" stroke-width=".15"/>`);
-paths.push(rect(.15,q.hallWall,W-.3,D-q.hallWall-.15,highlight==='hall'?'#dbe6c6':'#f4f2e5','none'));
-// Zones come from the same printed setting-out as the walls and fixtures.
-paths.push(rect(q.outerFace,q.outerFace,q.roomAWall-q.part-q.outerFace,q.hallFace-q.outerFace,highlight==='roomA'?'#dbe6c6':'#e7ebdc'));
-paths.push(rect(q.leftWcWall+q.part,q.outerFace,q.roomBWide,q.hallFace-q.outerFace,highlight==='roomB'?'#dbe6c6':'#e7ebdc'));
-paths.push(rect(q.roomAWall+q.part,q.outerFace,q.leftWc,q.wcUpper,'#cfded6'),rect(q.roomAWall+q.part,q.wcDivider+q.part,q.leftWc,q.wcLowerLeft,'#cfded6'));
-paths.push(rect(q.roomBWall+q.part,q.outerFace,q.rightWc,q.wcUpper,'#cfded6'),rect(q.roomBWall+q.part,q.wcDivider+q.part,q.rightWc,q.rightWcLower,'#cfded6'));
-paths.push(rect(q.urinalFace,q.outerFace,q.washWall-q.part-q.urinalFace,q.hallFace-q.outerFace,highlight==='wash'?'#bdd7c8':'#e5eee2'));
-paths.push(rect(q.urinalFace,q.outerFace,.4,q.hallFace-q.outerFace,'#d7e4dd','none'),rect(q.passageEnd,q.outerFace,q.washWall-q.part-q.passageEnd,q.hallFace-q.outerFace,'#d7e4dd','none'));
-paths.push(rect(EX+.12,D+.12,W-EX-.24,E-.24,highlight==='stair'?'#dbe6c6':'#ebecdf'));
-const sm=stairMetrics(plan.stair.depth,state.height);
-for(const [x,z,w,d] of [[plan.stair.x,plan.stair.z,plan.stair.width,plan.stair.depth]]){paths.push(rect(x,z,w,d,sm.going<TARGET_GOING?'#efdcc0':'#d9ddcf'));for(let i=0;i<sm.perFlight;i++)paths.push(`<path d="M${x} ${z+.85+i*(d-.85)/sm.perFlight}h${w}" stroke="#71836b" stroke-width=".025"/>`);paths.push(`<path d="M${x+w/2} ${z+.1}v${d-.2}" stroke="#71836b" stroke-width=".04"/>`)}
-paths.push(`<path d="M11.65 .25H15.2V1.5H12.9V3.35H11.65Z" fill="#d9ddcf" stroke="#71836b" stroke-width=".035"/>`);for(let i=0;i<10;i++){paths.push(`<path d="M11.65 ${1.5+i*1.85/10}h1.25 M${12.9+i*2.3/10} .25v1.25" stroke="#71836b" stroke-width=".025"/>`)}
-for(const c of colliders.filter(c=>c.floor===(state.floor==='1'?1:0)&&c.yMin<.1&&c.yMax>2)){paths.push(rect(c.axis==='x'?c.a:c.c-c.thick/2,c.axis==='x'?c.c-c.thick/2:c.a,c.axis==='x'?c.b-c.a:c.thick,c.axis==='x'?c.thick:c.b-c.a,'#536556','none'))}
-for(const [x,z] of columnPoints())paths.push(rect(x-columnSize()/2,z-columnSize()/2,columnSize(),columnSize(),'#3c5944','none'));
-const roomAx=(q.outerFace+q.roomAWall-q.part)/2,roomBx=(q.leftWcWall+q.part+q.roomBWall-q.part)/2;
-paths.push(txt(8.2,7.7,'MAIN HALL',.42),txt(8.2,8.3,'54′1″ × 34′6″ printed label',.27),txt(8.2,8.85,floor,.2),txt(roomAx,1.6,'ROOM A',.3),txt(roomAx,2,'11′0″ × 10′1″',.19),txt(roomBx,1.6,'ROOM B',.3),txt(roomBx,2,'10′0″ × 10′1″',.19),txt(14.2,15.6,state.floor==='1'?'STAIR LANDING':'ENTRANCE',.3),txt(14.2,16.1,state.floor==='1'?'ENTRY TO HALL':'& STAIR LOBBY',.2));
-const leftWcX=q.roomAWall+q.part+q.leftWc/2,rightWcX=q.roomBWall+q.part+q.rightWc/2;
-paths.push(txt(leftWcX,.9,'WC',.2),txt(leftWcX,1.12,'3′11″×4′10″',.13),txt(leftWcX,2.22,'WC',.2),txt(leftWcX,2.44,'3′11″×2′10″',.13));
-paths.push(txt(rightWcX,.9,'WC',.2),txt(rightWcX,1.12,'3′7″×4′10″',.13),txt(rightWcX,2.5,'WC',.2),txt(rightWcX,2.72,'3′7″×4′10″',.13));
-paths.push(`<text x="${q.urinalFace+.2}" y="1.7" transform="rotate(-90 ${q.urinalFace+.2} 1.7)" text-anchor="middle" font-size=".19" fill="#42604a" font-family="Arial,sans-serif">URINAL</text>`,`<text x="${(q.passageStart+q.passageEnd)/2}" y="1.7" transform="rotate(-90 ${(q.passageStart+q.passageEnd)/2} 1.7)" text-anchor="middle" font-size=".19" fill="#42604a" font-family="Arial,sans-serif">3′2″ WD. PASS.</text>`,`<text x="${(q.passageEnd+q.washWall)/2}" y="1.7" transform="rotate(-90 ${(q.passageEnd+q.washWall)/2} 1.7)" text-anchor="middle" font-size=".19" fill="#42604a" font-family="Arial,sans-serif">BASIN</text>`);
-const notes=['* Stair shown amber: the '+plan.stair.depth.toFixed(2)+' m well needs '+sm.requiredDepth.toFixed(2)+' m for a 250 mm going.','* 16.740 m outer width and the 54′1″ hall label conflict by about 205 mm.'];
-return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 23 26" role="img" aria-label="Annotated ${floor.toLowerCase()} plan"><rect x="-3" y="-3" width="23" height="26" fill="#fafbf5"/>${paths.join('')}${svgOpenings()}${svgAnnotations(floor,notes)}</svg>`}
+// One sheet renderer for every plan. Walls come from the collision set, columns
+// from the shared grid, and the stair from the shared metrics, so the 2D sheet
+// and the 3D model cannot describe different buildings.
+function svgPlan(highlight=''){
+ const upper=state.floor==='1',floor=upper?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR';
+ const st=plan.stair,sm=stairMetrics(st.depth,state.height),parts=[];
+ const rect=(x,z,w,d,fill,stroke='none',sw=.035)=>`<rect x="${x}" y="${z}" width="${w}" height="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+ parts.push(`<path d="M0 0H${W}V${D+E}H${EX}V${D}H0Z" fill="#f8f7ec" stroke="#3f5747" stroke-width=".15"/>`);
+ for(const item of planSheet(plan,upper)){
+  if(item[0]==='zone')parts.push(rect(item[2],item[3],item[4],item[5],highlight===item[1]?'#cfe3bd':item[6],item[7]));
+  else if(item[0]==='fill')parts.push(rect(item[1],item[2],item[3],item[4],item[5],item[6]));
+  else if(item[0]==='text')parts.push(svgText(item[1],item[2],item[3],item[4]));
+  else if(item[0]==='vtext')parts.push(`<text x="${item[1]}" y="${item[2]}" transform="rotate(-90 ${item[1]} ${item[2]})" text-anchor="middle" font-size="${item[4]}" fill="#42604a" font-family="Arial,sans-serif">${xmlText(item[3])}</text>`);
+  else parts.push(`<path d="${item[1]}" fill="${item[2]}" stroke="${item[3]}" stroke-width="${item[4]}"/>`);
+ }
+ parts.push(rect(st.x,st.z,st.width,st.depth,sm.going<TARGET_GOING?'#efdcc0':'#d9ddcf','#71836b',.03));
+ for(let i=0;i<sm.perFlight;i++)parts.push(`<path d="M${st.x} ${st.z+.88+i*(st.depth-.88)/sm.perFlight}h${st.width}" fill="none" stroke="#71836b" stroke-width=".03"/>`);
+ parts.push(`<path d="M${st.x+st.width/2} ${st.z+.88}v${st.depth-.88}" fill="none" stroke="#71836b" stroke-width=".05"/>`);
+ for(const c of colliders.filter(c=>c.floor===(upper?1:0)&&c.yMin<.1&&c.yMax>2))parts.push(rect(c.axis==='x'?c.a:c.c-c.thick/2,c.axis==='x'?c.c-c.thick/2:c.a,c.axis==='x'?c.b-c.a:c.thick,c.axis==='x'?c.thick:c.b-c.a,'#536556'));
+ for(const [x,z] of columnPoints())parts.push(rect(x-columnSize()/2,z-columnSize()/2,columnSize(),columnSize(),'#3c5944'));
+ const [vx,vy,vw,vh]=PLAN_VIEWBOX;
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" role="img" aria-label="${plan.name} drawing ${plan.drawing} ${floor.toLowerCase()}"><rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#fafbf5"/>${parts.join('')}${svgOpenings()}${svgAnnotations(floor,planSheetNotes(plan,sm))}</svg>`;
+}
+
 function svgOpenings(){
  const selected=state.floor==='1'?1:0;
  return openingsDrawn.filter(o=>o.floor===selected).map(o=>{
@@ -336,14 +294,17 @@ function svgOpenings(){
 }
 function renderPlan(highlight=selectedRoom){$('planView').innerHTML=svgPlan(highlight);applyPlanViewport()}
 
-function resize(){const w=Math.max(1,$('canvasWrap').clientWidth),h=Math.max(1,$('canvasWrap').clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=responsiveFov(camera.aspect);camera.updateProjectionMatrix();const span=14/Math.min(1,w/h);ortho.left=-span*w/h;ortho.right=span*w/h;ortho.top=span;ortho.bottom=-span;ortho.updateProjectionMatrix();invalidate()}
+function resize(){const w=Math.max(1,$('canvasWrap').clientWidth),h=Math.max(1,$('canvasWrap').clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=responsiveFov(camera.aspect);camera.updateProjectionMatrix();const span=14/Math.min(1,w/h);ortho.left=-span*w/h;ortho.right=span*w/h;ortho.top=span;ortho.bottom=-span;ortho.updateProjectionMatrix();
+// Re-fit after an aspect change, but only while the user has not taken over.
+if(autoFit&&!fitting){fitting=true;placeView(autoFit);fitting=false}
+invalidate()}
 new ResizeObserver(resize).observe($('canvasWrap'));
 // User controls
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));document.querySelectorAll('[data-floor]').forEach(b=>b.onclick=()=>{clearMeasure();state.floor=b.dataset.floor;if(state.mode==='walk'&&state.floor==='both'){state.mode='cutaway';state.roof=false;$('roof').checked=false;controls.enabled=true}if(state.mode==='plan'&&state.floor==='both')state.floor='0';if(state.mode==='walk'){camera.position.y=floorY()+1.65;if(!canWalk(camera.position.x,camera.position.z))camera.position.set(rooms.hall.x,floorY()+1.65,rooms.hall.z);}update();if(state.mode==='cutaway')bird()});document.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>focusRoom(b.dataset.room));
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));document.querySelectorAll('[data-floor]').forEach(b=>b.onclick=()=>{clearMeasure();state.floor=b.dataset.floor;if(state.mode==='walk'&&state.floor==='both'){state.mode='cutaway';state.roof=false;$('roof').checked=false;controls.enabled=true}if(state.mode==='plan'&&state.floor==='both')state.floor='0';if(state.mode==='walk'){walkY=floorY();camera.position.y=walkY+1.65;if(!canWalk(camera.position.x,camera.position.z,walkY))camera.position.set(rooms.hall.x,walkY+1.65,rooms.hall.z);}update();if(state.mode==='cutaway')bird()});document.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>focusRoom(b.dataset.room));
 for(const k of ['roof','labels','dimensions','furniture','grid'])$(k).onchange=e=>{state[k]=e.target.checked;if(k==='furniture'&&state.mode==='walk'&&!canWalk(camera.position.x,camera.position.z)){const p=safeWalkTarget(camera.position);camera.position.set(p.x,floorY()+1.65,p.z)}update()};
 for(const k of ['explode','section'])$(k).oninput=e=>{state[k]=Number(e.target.value);clearMeasure();update()};// A full rebuild per input event stalled the main thread; coalesce to one per frame.
 let heightFrame=0;
-$('height').oninput=e=>{state.height=Number(e.target.value);$('heightOut').textContent=state.height.toFixed(1)+' m';if(heightFrame)return;heightFrame=requestAnimationFrame(()=>{heightFrame=0;build();if(state.mode==='walk'){camera.position.y=floorY()+1.65;if(!canWalk(camera.position.x,camera.position.z))camera.position.set(rooms.hall.x,floorY()+1.65,rooms.hall.z);}clearMeasure()})};
+$('height').oninput=e=>{state.height=Number(e.target.value);$('heightOut').textContent=state.height.toFixed(1)+' m';if(heightFrame)return;heightFrame=requestAnimationFrame(()=>{heightFrame=0;build();if(state.mode==='walk'){walkY=floorY();camera.position.y=walkY+1.65;if(!canWalk(camera.position.x,camera.position.z,walkY))camera.position.set(rooms.hall.x,walkY+1.65,rooms.hall.z);}clearMeasure()})};
 $('style').onchange=e=>{state.style=e.target.value;update()};$('units').onchange=e=>{state.units=e.target.value;if(measurePoints.length===2)$('measureInfo').textContent='Distance: '+formatDistance(measurePoints[0].distanceTo(measurePoints[1]))+' · click to measure again';toast('Measurements now use '+(state.units==='m'?'metres':'feet and inches'))};$('light').onchange=e=>{state.light=e.target.value;const evening=state.light==='evening';sun.color.set(evening?0xffc28e:0xfff6dc);sun.position.set(evening?-20:-8,evening?8:27,16);scene.background.set(evening?'#536171':'#e7ebe1');sun.intensity=evening?.7:3.1;fill.intensity=evening?.45:1.25;exteriorMats.glow.emissiveIntensity=evening?4:.25;gardenLights.forEach(l=>l.intensity=evening?14:0);renderer.toneMappingExposure=evening?1.05:1.25;update()};
 function openDialog(id){keys.clear();drag=null;controls.autoRotate=false;$('rotate').classList.remove('active');$(id).showModal()}
 $('sourceBtn').onclick=()=>openDialog('sourceDialog');$('exportBtn').onclick=()=>openDialog('exportDialog');document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}}));
@@ -389,7 +350,7 @@ function dxfPlan(){
  if(plan.rearStair)rect('A-STRS',11.65,.25,3.55,3.1);
  line('A-GRID',0,-1,W,-1);text('A-ANNO',W/2-1.4,-1.35,.28,W.toFixed(3)+' m overall width');
  line('A-GRID',-1,0,-1,D);text('A-ANNO',-2.9,D/2,.28,D.toFixed(3)+' m depth');
- const rearZ=plan.id==='B'?.125:.11,bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
+ const rearZ=Math.min(...columnPoints().map(([,z])=>z)),bays=[...new Set(columnPoints().filter(([,z])=>Math.abs(z-rearZ)<1e-6).map(([x])=>x))].sort((a,b)=>a-b);
  for(let i=0;i<bays.length-1;i++){line('A-GRID',bays[i],-2,bays[i+1],-2);text('A-ANNO',(bays[i]+bays[i+1])/2-.4,-2.3,.24,(bays[i+1]-bays[i]).toFixed(3))}
  text('A-ANNO',0,D+E+1.6,.4,'PLAN ATLAS - DRAWING '+plan.drawing+' - '+plan.name);
  text('A-ANNO',0,D+E+2.2,.26,(level?'FIRST FLOOR (ASSUMED REPEAT)':'GROUND FLOOR')+' - CONCEPT, NOT A CONSTRUCTION DRAWING');
@@ -398,7 +359,53 @@ function dxfPlan(){
  return out.join('\r\n')+'\r\n';
 }
 $('dxfExport').onclick=()=>{download('plan-'+plan.id.toLowerCase()+'-'+plan.drawing+'-'+(state.floor==='1'?'first':'ground')+'-floor-plan.dxf',dxfPlan(),'application/dxf');toast('DXF floor plan exported with layers')};
-$('jsonExport').onclick=()=>{download('plan-'+plan.id.toLowerCase()+'-'+plan.drawing+'-specification.json',JSON.stringify({name:'Plan Atlas '+plan.name,drawing:plan.drawing,plan:plan.id,units:'metres',levels:2,mainBlock:{width:W,depth:D,widthBasis:plan.widthBasis},frontExtension:{startsAtX:EX,projection:E,provisional:plan.id==='B'},stairs:{front:plan.stair,rear:plan.rearStair},floorToFloor:state.height,outerWall:T,slab:SLAB,stairReview:stairReview(),readings:plan.readings,source:'User-provided drawing '+plan.drawing+'; photograph kept local',assumptions:[...plan.notes,'Floor height, structure, elevations, door locations, furniture and landscaping are illustrative. Not construction documentation.']},null,2),'application/json');toast(plan.name+' specification exported')};
+// Minimal glTF 2.0 binary writer. Vendoring GLTFExporter would add roughly 90 KB
+// of runtime for a model that is only indexed triangles with flat PBR colours.
+function glbModel(){
+ const prior={...state};Object.assign(state,{floor:'both',mode:'exterior',explode:0,roof:true,section:100});update();
+ model.updateMatrixWorld(true);site.updateMatrixWorld(true);
+ const names=materialLibrary(),parts=[],accessors=[],bufferViews=[],meshes=[],nodes=[],materials=[],materialIndex=new Map();
+ let offset=0;const align=n=>(4-n%4)%4;
+ const push=(data,target)=>{const pad=align(offset);if(pad){parts.push(new Uint8Array(pad));offset+=pad}
+  parts.push(new Uint8Array(data.buffer,data.byteOffset,data.byteLength));
+  bufferViews.push({buffer:0,byteOffset:offset,byteLength:data.byteLength,target});
+  offset+=data.byteLength;return bufferViews.length-1};
+ const v=new THREE.Vector3(),n=new THREE.Vector3(),nm=new THREE.Matrix3();
+ for(const root of [model,site])root.traverse(o=>{
+  if(!o.isMesh||!o.geometry)return;let p=o;while(p&&p!==root){if(!p.visible)return;p=p.parent}
+  const geom=o.geometry,pos=geom.attributes.position,nrm=geom.attributes.normal,count=pos.count;
+  const positions=new Float32Array(count*3),min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<count;i++){v.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);positions.set([v.x,v.y,v.z],i*3);
+   for(let a=0;a<3;a++){const c=v.getComponent(a);if(c<min[a])min[a]=c;if(c>max[a])max[a]=c}}
+  const posAcc=accessors.length;accessors.push({bufferView:push(positions,34962),componentType:5126,count,type:'VEC3',min,max});
+  let normalAcc;
+  if(nrm){const normals=new Float32Array(count*3);nm.getNormalMatrix(o.matrixWorld);
+   for(let i=0;i<count;i++){n.fromBufferAttribute(nrm,i).applyMatrix3(nm).normalize();normals.set([n.x,n.y,n.z],i*3)}
+   normalAcc=accessors.length;accessors.push({bufferView:push(normals,34962),componentType:5126,count,type:'VEC3'})}
+  const index=geom.index?Uint32Array.from(geom.index.array):Uint32Array.from({length:count},(_,i)=>i);
+  const indexAcc=accessors.length;accessors.push({bufferView:push(index,34963),componentType:5125,count:index.length,type:'SCALAR'});
+  if(!materialIndex.has(o.material)){const c=o.material.userData?.base||o.material.color;materialIndex.set(o.material,materials.length);
+   materials.push({name:names.get(o.material)||'mat_'+o.material.color.getHexString(),doubleSided:true,
+    ...(o.material.transparent?{alphaMode:'BLEND'}:{}),
+    pbrMetallicRoughness:{baseColorFactor:[c.r,c.g,c.b,o.material.transparent?o.material.opacity:1],metallicFactor:o.material.metalness||0,roughnessFactor:o.material.roughness??.8}})}
+  nodes.push({name:o.name,mesh:meshes.length});
+  meshes.push({name:o.name,primitives:[{attributes:{POSITION:posAcc,...(normalAcc===undefined?{}:{NORMAL:normalAcc})},indices:indexAcc,material:materialIndex.get(o.material)}]});
+ });
+ Object.assign(state,prior);update();
+ const bin=new Uint8Array(offset);let at=0;for(const part of parts){bin.set(part,at);at+=part.length}
+ const json=new TextEncoder().encode(JSON.stringify({
+  asset:{version:'2.0',generator:'Plan Atlas · '+plan.name+' · drawing '+plan.drawing+' · concept model, metres, Y up'},
+  scene:0,scenes:[{name:plan.name,nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews,buffers:[{byteLength:bin.length}]}));
+ const jsonPad=align(json.length),binPad=align(bin.length),total=12+8+json.length+jsonPad+8+bin.length+binPad;
+ const out=new Uint8Array(total),dv=new DataView(out.buffer);let at2=0;
+ const u32=value=>{dv.setUint32(at2,value,true);at2+=4};
+ u32(0x46546C67);u32(2);u32(total);
+ u32(json.length+jsonPad);u32(0x4E4F534A);out.set(json,at2);at2+=json.length;for(let i=0;i<jsonPad;i++)out[at2++]=0x20;
+ u32(bin.length+binPad);u32(0x004E4942);out.set(bin,at2);
+ return out;
+}
+$('glbExport').onclick=()=>{download('plan-'+plan.id.toLowerCase()+'-'+plan.drawing+'-two-floors.glb',glbModel(),'model/gltf-binary');toast('glTF binary exported with materials')};
+$('jsonExport').onclick=()=>{download('plan-'+plan.id.toLowerCase()+'-'+plan.drawing+'-specification.json',JSON.stringify({name:'Plan Atlas '+plan.name,drawing:plan.drawing,plan:plan.id,units:'metres',levels:2,mainBlock:{width:W,depth:D,widthBasis:plan.widthBasis},frontExtension:{startsAtX:EX,projection:E,provisional:!!plan.projectionProvisional},stairs:{front:plan.stair,rear:plan.rearStair},floorToFloor:state.height,outerWall:T,slab:SLAB,stairReview:stairReview(),readings:plan.readings,source:'User-provided drawing '+plan.drawing+'; photograph kept local',assumptions:[...plan.notes,'Floor height, structure, elevations, door locations, furniture and landscaping are illustrative. Not construction documentation.']},null,2),'application/json');toast(plan.name+' specification exported')};
 // Stable material names so the OBJ can carry a companion MTL; without it every
 // colour was lost on import and the whole model arrived flat grey.
 function materialLibrary(){const names=new Map();
@@ -458,12 +465,42 @@ function safeWalkTarget(r){
  for(let radius=.25;radius<=1.5;radius+=.25)for(let i=0;i<16;i++){const x=r.x+radius*Math.cos(i*Math.PI/8),z=r.z+radius*Math.sin(i*Math.PI/8);if(canWalk(x,z))return {x,z}}
  return rooms.hall;
 }
-function canWalk(x,z){if(x<.35||x>W-.35||z<.35||z>D+E-.35||(x<EX+.3&&z>D-.35))return false;const level=state.floor==='1'?1:0;if(state.furniture&&furnitureObstacles.some(o=>o.floor===level&&Math.abs(x-o.x)<o.w/2+.18&&Math.abs(z-o.z)<o.d/2+.18))return false;const st=plan.stair;if(x>st.x-.18&&x<st.x+st.width+.18&&z>st.z-.18&&z<st.z+st.depth+.18)return false;if(plan.rearStair&&((x>11.47&&x<13.08&&z<3.53)||(x>12.72&&x<15.38&&z<1.68)))return false;for(const c of colliders){if(c.floor!==level||c.yMin>1.7||c.yMax<1.7)continue;const along=c.axis==='x'?x:z,cross=c.axis==='x'?z:x;if(along>c.a-.16&&along<c.b+.16&&Math.abs(cross-c.c)<c.thick/2+.18)return false}for(const [cx,cz] of [...columnPoints(),...[EX+.11,12.72,W-.11].map(cx=>[cx,D+E-.11])])if(Math.abs(x-cx)<columnSize()/2+.18&&Math.abs(z-cz)<columnSize()/2+.18)return false;for(const o of openingsDrawn.filter(o=>o.floor===level&&o.door)){const angle=o.axis==='x'?(o.inward?Math.PI*.34:-Math.PI*.34):-Math.PI/2-Math.PI*.16,px=o.axis==='x'?o.a:o.c,pz=o.axis==='x'?o.c:o.a,w=o.b-o.a,dx=x-px,dz=z-pz,along=dx*Math.cos(angle)-dz*Math.sin(angle),cross=dx*Math.sin(angle)+dz*Math.cos(angle);if(along>-.16&&along<w+.16&&Math.abs(cross)<.19)return false}return true}
+// Each flight is a continuous ramp in plan, so the walking surface can be
+// evaluated analytically rather than by ray-casting individual treads. The same
+// function gives stair traversal and the upper-void block: a point on a flight
+// is only reachable when its surface is near the walker's current elevation.
+function stairSurface(x,z){
+ const st=plan.stair,h=state.height,pad=.12,run=st.depth-.88;
+ if(x>=st.x-pad&&x<=st.x+st.width+pad&&z>=st.z-pad&&z<=st.z+st.depth+pad){
+  if(z<=st.z+.88)return h/2;
+  const t=Math.max(0,Math.min(1,(z-(st.z+.88))/run));
+  return x<=st.x+st.width/2?h/2*(1-t):h/2*(1+t);
+ }
+ if(plan.rearStair&&x>=11.65-pad&&x<=15.2+pad&&z>=.25-pad&&z<=3.35+pad){
+  if(x<=12.9)return z>=1.5?h/2*Math.max(0,Math.min(1,(3.35-z)/1.85)):h/2;
+  if(z<=1.5)return h/2*(1+Math.max(0,Math.min(1,(x-12.9)/2.3)));
+ }
+ return null;
+}
+function walkElevation(){return state.mode==='walk'&&stairSurface(camera.position.x,camera.position.z)!==null?walkY:floorY()}
+function canWalk(x,z,y=walkElevation()){if(x<.35||x>W-.35||z<.35||z>D+E-.35||(x<EX+.3&&z>D-.35))return false;
+ const surface=stairSurface(x,z);
+ if(surface!==null)return Math.abs(surface-y)<=.5;
+ // Off a flight you must be standing at a storey level, never part-way up one.
+ if(Math.abs(y)>.5&&Math.abs(y-state.height)>.5)return false;
+ const level=Math.abs(y-state.height)<.5?1:0;if(state.furniture&&furnitureObstacles.some(o=>o.floor===level&&Math.abs(x-o.x)<o.w/2+.18&&Math.abs(z-o.z)<o.d/2+.18))return false;for(const c of colliders){if(c.floor!==level||c.yMin>1.7||c.yMax<1.7)continue;const along=c.axis==='x'?x:z,cross=c.axis==='x'?z:x;if(along>c.a-.16&&along<c.b+.16&&Math.abs(cross-c.c)<c.thick/2+.18)return false}for(const [cx,cz] of [...columnPoints(),...[EX+.11,12.72,W-.11].map(cx=>[cx,D+E-.11])])if(Math.abs(x-cx)<columnSize()/2+.18&&Math.abs(z-cz)<columnSize()/2+.18)return false;for(const o of openingsDrawn.filter(o=>o.floor===level&&o.door)){const angle=o.axis==='x'?(o.inward?Math.PI*.34:-Math.PI*.34):-Math.PI/2-Math.PI*.16,px=o.axis==='x'?o.a:o.c,pz=o.axis==='x'?o.c:o.a,w=o.b-o.a,dx=x-px,dz=z-pz,along=dx*Math.cos(angle)-dz*Math.sin(angle),cross=dx*Math.sin(angle)+dz*Math.cos(angle);if(along>-.16&&along<w+.16&&Math.abs(cross)<.19)return false}return true}
 const labelRay=new THREE.Raycaster();const labelBounds=[];let lastLabelTime=0;
-function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-lastTime)/1000,.05);lastTime=now;if(document.hidden)return;const paused=!!document.querySelector('dialog[open]')||drawer.isOpen();if(paused)keys.clear();if(state.mode==='walk'){const f=(keys.has('w')||keys.has('ArrowUp')?1:0)-(keys.has('s')||keys.has('ArrowDown')?1:0),s=(keys.has('d')||keys.has('ArrowRight')?1:0)-(keys.has('a')||keys.has('ArrowLeft')?1:0);const norm=f&&s?Math.SQRT1_2:1,dx=(-Math.sin(walkYaw)*f+Math.cos(walkYaw)*s)*dt*2.5*norm,dz=(-Math.cos(walkYaw)*f-Math.sin(walkYaw)*s)*dt*2.5*norm;if(canWalk(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(canWalk(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.order='YXZ';camera.rotation.set(walkPitch,walkYaw,0);if(f||s||drag)invalidate()}else if(!orthoMode&&state.mode!=='plan'){controls.update();if(controls.autoRotate)invalidate()}
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-lastTime)/1000,.05);lastTime=now;if(document.hidden)return;const paused=!!document.querySelector('dialog[open]')||drawer.isOpen();if(paused)keys.clear();if(state.mode==='walk'){const f=(keys.has('w')||keys.has('ArrowUp')?1:0)-(keys.has('s')||keys.has('ArrowDown')?1:0),s=(keys.has('d')||keys.has('ArrowRight')?1:0)-(keys.has('a')||keys.has('ArrowLeft')?1:0);const norm=f&&s?Math.SQRT1_2:1,dx=(-Math.sin(walkYaw)*f+Math.cos(walkYaw)*s)*dt*2.5*norm,dz=(-Math.cos(walkYaw)*f-Math.sin(walkYaw)*s)*dt*2.5*norm;if(canWalk(camera.position.x+dx,camera.position.z,walkY))camera.position.x+=dx;if(canWalk(camera.position.x,camera.position.z+dz,walkY))camera.position.z+=dz;
+// Follow the stair surface, and snap to the nearest storey once off a flight.
+const surface=stairSurface(camera.position.x,camera.position.z);
+walkY=surface!==null?surface:(Math.abs(walkY-state.height)<.5?state.height:0);
+camera.position.y=walkY+1.65;
+const reached=Math.abs(walkY-state.height)<.5?'1':'0';
+if(state.floor!==reached&&surface===null){state.floor=reached;update();toast(reached==='1'?'First floor · assumed repeat':'Ground floor')}
+camera.rotation.order='YXZ';camera.rotation.set(walkPitch,walkYaw,0);if(f||s||drag||surface!==null)invalidate()}else if(!orthoMode&&state.mode!=='plan'){controls.update();if(controls.autoRotate)invalidate()}
 if(state.mode!=='plan'&&needsRender){renderer.render(scene,activeCamera);needsRender=false}if(!labelsDirty||now-lastLabelTime<120)return;lastLabelTime=now;labelsDirty=false;const width=$('canvasWrap').clientWidth,height=$('canvasWrap').clientHeight;labelBounds.length=0;
 // Sort so the hall keeps its label and a secondary caption is the one dropped.
-for(const l of [...labelDefs].sort((a,b)=>a.priority-b.priority)){const show=l.g.visible&&(l.kind==='dim'?state.dimensions&&(state.mode==='cutaway'||state.mode==='exterior'):state.labels&&state.mode==='cutaway');if(!show){l.el.style.display='none';continue}const p=l.pos.clone().applyMatrix4(l.g.matrixWorld);if(p.z>globalClip.constant){l.el.style.display='none';continue}const world=p.clone(),delta=world.clone().sub(activeCamera.position),distance=delta.length();labelRay.set(activeCamera.position,delta.normalize());const blocked=l.kind!=='dim'&&labelRay.intersectObjects([model,ceilingGroup],true).some(hit=>{if(hit.distance>distance-.2||hit.point.z>globalClip.constant)return false;let parent=hit.object;while(parent){if(!parent.visible)return false;parent=parent.parent}return !(hit.object.material.clippingPlanes||[]).some(plane=>plane.distanceToPoint(hit.point)<0)});p.project(activeCamera);const x=(p.x*.5+.5)*width,y=(-p.y*.5+.5)*height;const rect={x:x-55,y:y-14,w:110,h:28};const overlap=labelBounds.some(b=>rect.x<b.x+b.w&&rect.x+rect.w>b.x&&rect.y<b.y+b.h&&rect.y+rect.h>b.y);const occluded=blocked||overlap;if(!occluded)labelBounds.push(rect);l.el.style.display=p.z<1&&p.z>-1&&x>0&&x<width&&y>15&&y<height-15&&!occluded?'block':'none';l.el.style.left=x+'px';l.el.style.top=y+'px'}
+for(const l of [...labelDefs].sort((a,b)=>a.priority-b.priority)){const show=l.g.visible&&(l.kind==='dim'?state.dimensions&&(state.mode==='cutaway'||state.mode==='exterior'):state.labels&&state.mode==='cutaway');if(!show){l.el.style.display='none';continue}const p=l.pos.clone().applyMatrix4(l.g.matrixWorld);if(p.z>globalClip.constant){l.el.style.display='none';continue}const world=p.clone(),delta=world.clone().sub(activeCamera.position),distance=delta.length();labelRay.set(activeCamera.position,delta.normalize());const blocked=l.kind!=='dim'&&labelRay.intersectObjects([model],true).some(hit=>{if(hit.distance>distance-.2||hit.point.z>globalClip.constant)return false;let parent=hit.object;while(parent){if(!parent.visible)return false;parent=parent.parent}return !(hit.object.material.clippingPlanes||[]).some(plane=>plane.distanceToPoint(hit.point)<0)});p.project(activeCamera);const x=(p.x*.5+.5)*width,y=(-p.y*.5+.5)*height;const rect={x:x-55,y:y-14,w:110,h:28};const overlap=labelBounds.some(b=>rect.x<b.x+b.w&&rect.x+rect.w>b.x&&rect.y<b.y+b.h&&rect.y+rect.h>b.y);const occluded=blocked||overlap;if(!occluded)labelBounds.push(rect);l.el.style.display=p.z<1&&p.z>-1&&x>0&&x<width&&y>15&&y<height-15&&!occluded?'block':'none';l.el.style.left=x+'px';l.el.style.top=y+'px'}
 }
 // The whole view is shareable, not just the plan choice.
 const LAYERS=['roof','labels','dimensions','furniture','grid'];

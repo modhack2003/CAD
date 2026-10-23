@@ -15,6 +15,24 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       # Same command Vercel runs for the build, so a red PR cannot deploy green.
+      # Covers geometry, mobile, plan navigation, the CSP/caching/icon checks and
+      # vendored-module provenance.
       - run: npm test
-      - name: Check the import map hash matches the Content-Security-Policy
-        run: node scripts/check-csp.mjs
+
+  vendor-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Independently confirm the vendored three.js is byte-identical to the
+      # published package, which is the property that makes a committed dist/
+      # auditable instead of opaque.
+      - name: Diff vendored three.js against npm
+        run: |
+          npm pack three@0.170.0 --pack-destination /tmp >/dev/null
+          tar xzf /tmp/three-0.170.0.tgz -C /tmp
+          cmp /tmp/package/build/three.module.min.js dist/vendor/three.module.min.js
+          cmp /tmp/package/examples/jsm/controls/OrbitControls.js dist/vendor/OrbitControls.js
+          echo "Vendored modules match three@0.170.0 exactly."

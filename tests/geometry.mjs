@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import {responsiveFov} from '../dist/mobile-ui.js';
 const root=fileURLToPath(new URL('../dist/',import.meta.url));
 const temp=await fs.mkdtemp(path.join(tmpdir(),'plan-atlas-test-'));
 const testModule=path.join(temp,'model-under-test.mjs');
@@ -14,7 +15,7 @@ const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'}
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.min.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){}addEventListener(){}listenToKeyEvents(){} }`);
 source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`).replace("from './plans.js'",`from 'file://${root}plans.js'`).replace("from './plan-navigation.js'",`from 'file://${root}plan-navigation.js'`);
-source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,stairMetrics,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,keys,dimGroup,planAGrid,interiorLights,scene,dxfPlan};';
+source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,stairMetrics,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,keys,dimGroup,planAGrid,interiorLights,scene,dxfPlan,glbModel,stairSurface,frameRadius,fitDistance,walkY};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
 assert.equal(document.getElementById('labelLayer').hidden,true,'2D fallback hides unprojected 3D labels');assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
@@ -80,6 +81,31 @@ const bSvg=m.svgPlan();assert.ok(bSvg.includes('218124'));assert.ok(bSvg.include
 document.getElementById('jsonExport').onclick();const spec=JSON.parse(await downloads.at(-1).text());assert.equal(spec.plan,'B');assert.equal(spec.mainBlock.width,16.74);assert.equal(spec.frontExtension.provisional,true);assert.equal(spec.stairs.rear,false);
 document.getElementById('objExport').onclick();const bObj=await downloads.at(-2).text();assert.ok(bObj.includes('drawing 218124'));assert.ok(!/NaN|Infinity/.test(bObj));assert.ok(bObj.includes('Plan_B_Front_room_divider'));assert.ok(!bObj.includes('Rear_L_stair'));
 const bLines=bObj.split('\n'),bVertices=bLines.filter(l=>l.startsWith('v ')).length;for(const line of bLines.filter(l=>l.startsWith('f ')))for(const index of faceIndices(line))assert.ok(index>=1&&index<=bVertices);
+// glTF binary: validate the container and that every index the JSON references exists.
+document.getElementById('glbExport').onclick();
+const glb=new Uint8Array(await downloads.at(-1).arrayBuffer());
+const glbView=new DataView(glb.buffer);
+assert.equal(glbView.getUint32(0,true),0x46546C67,'GLB magic');
+assert.equal(glbView.getUint32(4,true),2,'glTF version 2');
+assert.equal(glbView.getUint32(8,true),glb.length,'GLB length header matches the file');
+const jsonLength=glbView.getUint32(12,true);
+assert.equal(glbView.getUint32(16,true),0x4E4F534A,'first chunk is JSON');
+assert.equal(jsonLength%4,0,'JSON chunk is 4-byte aligned');
+const gltf=JSON.parse(new TextDecoder().decode(glb.subarray(20,20+jsonLength)));
+assert.equal(glbView.getUint32(20+jsonLength+4,true),0x004E4942,'second chunk is BIN');
+const binLength=glbView.getUint32(20+jsonLength,true);
+assert.equal(binLength%4,0,'BIN chunk is 4-byte aligned');
+assert.ok(gltf.meshes.length>300&&gltf.materials.length>5,'glTF carries the model and its materials');
+assert.ok(gltf.buffers[0].byteLength<=binLength,'buffer fits the BIN chunk');
+for(const view of gltf.bufferViews){assert.equal(view.byteOffset%4,0,'bufferView aligned');assert.ok(view.byteOffset+view.byteLength<=gltf.buffers[0].byteLength,'bufferView inside the buffer')}
+for(const accessor of gltf.accessors)assert.ok(accessor.bufferView<gltf.bufferViews.length,'accessor references a real bufferView');
+for(const mesh of gltf.meshes)for(const prim of mesh.primitives){
+ assert.ok(prim.attributes.POSITION<gltf.accessors.length&&prim.indices<gltf.accessors.length,'primitive accessors exist');
+ assert.ok(prim.material<gltf.materials.length,'primitive material exists');
+ const idx=gltf.accessors[prim.indices],pos=gltf.accessors[prim.attributes.POSITION];
+ assert.equal(idx.type,'SCALAR');assert.equal(pos.type,'VEC3');assert.ok(pos.min.every(Number.isFinite)&&pos.max.every(Number.isFinite),'POSITION bounds are finite');
+}
+for(const material of gltf.materials)for(const channel of material.pbrMetallicRoughness.baseColorFactor)assert.ok(channel>=0&&channel<=1,'glTF colours normalised');
 // DXF is the export a CAD user actually needs; check it parses as R12 with layers.
 document.getElementById('dxfExport').onclick();const dxf=await downloads.at(-1).text();
 assert.ok(dxf.startsWith('0\r\nSECTION'),'DXF starts with a section');assert.ok(dxf.trimEnd().endsWith('EOF'),'DXF terminated');
@@ -188,7 +214,52 @@ for(const h of [2.8,3.3,4.5]){m.state.height=h;m.build();const review=m.stairRev
 m.state.height=3.3;m.switchPlan('B',false);
 assert.ok(m.stairReview().front.shortfall<.05,'Plan B stair is close to the going target');
 assert.ok(m.stairReview().front.verdict.includes('marginal'),'Plan B stair reported as marginal, not compliant');
-console.log('Review fixes passed: printed Plan A compartments, corrected width and projection, basin/urinal zone, single dimension layer, interior lighting, Plan B furniture and lobby, capped risers with reported shortfall, sheet scale/north/title block.');
+// Guard: the renderer must stay plan-agnostic, so a further alternative is a
+// data entry in plans.js rather than a second code path. Two hand-written
+// geometry lists are what let the column grid drift out of sync in the first place.
+{
+ const appSource=await fs.readFile(root+'app.js','utf8');
+ assert.ok(!appSource.includes("plan.id==="),'app.js must not branch on the plan identifier');
+ assert.ok(!/function\s+(buildFloorB|svgPlanB|furniture)\s*\(/.test(appSource),'no per-plan builders remain');
+ for(const descriptor of ['planShell','planFixtures','planLabels','planRails','planSheet','planColumns'])
+  assert.ok(appSource.includes(descriptor),'the renderer consumes '+descriptor);
+ const planSource=await fs.readFile(root+'plans.js','utf8');
+ assert.ok(!/\bTHREE\b/.test(planSource),'layout data stays free of three.js objects');
+}
+// Walkthrough stair traversal: the flights are continuous and carry you between
+// storeys, while still refusing to let you float over the upper void.
+for(const id of ['A','B']){
+ m.switchPlan(id,false);Object.assign(m.state,{mode:'walk',floor:'0',height:3.3,furniture:true});m.build();m.update();
+ const st=m.plan.stair,h=3.3,run=st.depth-.88,lowX=st.x+st.width*.25,highX=st.x+st.width*.75;
+ assert.ok(Math.abs(m.stairSurface(lowX,st.z+st.depth))<1e-9,id+' flight starts at the lower floor');
+ assert.ok(Math.abs(m.stairSurface(lowX,st.z+.88)-h/2)<1e-9,id+' flight reaches the mid landing');
+ assert.ok(Math.abs(m.stairSurface(highX,st.z+.88)-h/2)<1e-9,id+' landing is continuous with the upper flight');
+ assert.ok(Math.abs(m.stairSurface(highX,st.z+st.depth)-h)<1e-9,id+' upper flight arrives at the first floor');
+ assert.equal(m.stairSurface(m.rooms.hall.x,m.rooms.hall.z),null,id+' the hall is not a flight');
+ let previous=0;
+ for(let t=0;t<=1.0001;t+=.02){const surface=m.stairSurface(lowX,st.z+st.depth-t*run);assert.ok(Math.abs(surface-previous)<=h/2*.03+1e-9,id+' the climb has no jump');previous=surface}
+ assert.ok(m.canWalk(lowX,st.z+st.depth-.1,0),id+' the foot of the stair is reachable from the ground');
+ assert.ok(!m.canWalk(lowX,st.z+1.2,0),id+' mid-flight is not reachable from the ground floor');
+ assert.ok(m.canWalk(lowX,st.z+1.2,m.stairSurface(lowX,st.z+1.2)),id+' mid-flight is walkable at its own elevation');
+ assert.ok(!m.canWalk(m.rooms.hall.x,m.rooms.hall.z,h/2),id+' cannot step off a flight part-way up');
+ assert.ok(m.canWalk(highX,st.z+st.depth-.1,h),id+' the top of the stair is reachable at first-floor level');
+ assert.ok(!m.canWalk(lowX,st.z+1.2,h),id+' the upper void still blocks walking');
+ for(const floor of m.floors)assert.equal(floor.visible,true,id+' both storeys stay visible while walking between them');
+}
+m.switchPlan('A',false);Object.assign(m.state,{mode:'exterior',floor:'both',height:3.3});m.update();
+// Camera fitting replaces hand-placed positions that left a portrait viewport
+// with the model about a quarter too small.
+{
+ const cam=m.camera,priorFov=cam.fov,priorAspect=cam.aspect;
+ const fitted=(w,h)=>{cam.aspect=w/h;cam.fov=responsiveFov(cam.aspect);cam.updateProjectionMatrix();return m.fitDistance(m.frameRadius())};
+ const landscape=fitted(1280,684),portrait=fitted(390,590);
+ assert.ok(m.frameRadius()>10&&m.frameRadius()<22,'model radius is plausible');
+ assert.ok(m.frameRadius(true)>m.frameRadius(),'the exterior view also frames the garden');
+ assert.ok(Math.abs(landscape-portrait)<.01,'horizontal coverage is preserved across orientations');
+ assert.ok(portrait<42.6,'fitted distance is closer than the old fixed cutaway position');
+ cam.fov=priorFov;cam.aspect=priorAspect;cam.updateProjectionMatrix();
+}
+console.log('Review fixes passed: printed Plan A compartments, corrected width and projection, basin/urinal zone, single dimension layer, interior lighting, Plan B furniture and lobby, capped risers with reported shortfall, sheet scale/north/title block, stair traversal and camera fitting.');
 m.switchPlan(process.env.CAD_RENDER_PLAN==='B'?'B':'A',false);Object.assign(m.state,{mode:'exterior',floor:process.env.CAD_RENDER_FLOOR||'both',roof:process.env.CAD_RENDER_ROOF!=='off'});m.update();m.model.updateMatrixWorld(true);m.site.updateMatrixWorld(true);
 console.log('Plan B checks passed: distinct layout, three WCs, single stair, slab/entry support, height limits, exports and repeated plan switching.');
 if(process.env.CAD_SVG_OUTPUT)await fs.writeFile(process.env.CAD_SVG_OUTPUT,m.svgPlan());

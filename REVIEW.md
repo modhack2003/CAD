@@ -1,10 +1,15 @@
 # Plan Atlas — code, deployment and drawing review
 
-> **Status.** The findings in §§4–10 below have been addressed on this branch. See
-> **README.md → "Review round 3"** for what changed in response to each one, including the three items
-> deliberately deferred (walkthrough stair traversal, the three.js r170 → r186 jump, and the full
-> data-driven refactor) and the reasons. This document is kept as the review record, written against
-> `main` at `2e4e460`, so the reasoning behind each change stays readable.
+> **Status: all findings addressed.** §§4–10 were fixed first (README → "Review round 3"), then the four
+> items that had been deferred — walkthrough stair traversal, camera fitting, glTF export and the full
+> data-driven refactor of §11 — were completed (README → "Round 4"). The one recommendation **not** taken is
+> the three.js r170 → r186 bump: upstream split the package and stopped publishing a minified build, so
+> shipping r186 would be 7% larger *and* would cost the byte-for-byte provenance of the vendored files.
+> That trade-off is documented with measurements in README → "Still on r170, and why", and the provenance
+> property is now enforced by `scripts/check-vendor.mjs` and a CI `cmp` against npm.
+>
+> This document is kept as the review record, written against `main` at `2e4e460`, so the reasoning behind
+> each change stays readable.
 
 **Scope:** `modhack2003/CAD` at `2e4e460` (main) and the production deployment
 <https://cad-alpha-two.vercel.app/>, cross-checked against the two reference photographs of drawings
