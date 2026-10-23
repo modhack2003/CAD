@@ -17,7 +17,7 @@ source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'
 source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,keys};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
-assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
+assert.equal(document.getElementById('labelLayer').hidden,true,'2D fallback hides unprojected 3D labels');assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
 assert.ok(meshes>350);assert.ok(m.colliders.length>100);
 assert.ok(m.canWalk(8,11.8));assert.ok(!m.canWalk(-1,8));assert.ok(!m.canWalk(8.13,1.5));
 document.getElementById('objExport').onclick();

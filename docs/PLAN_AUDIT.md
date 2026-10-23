@@ -37,6 +37,8 @@ Compared the supplied photographs of drawing 218129 (Plan A) and 218124 (Plan B)
 
 | 29 | Landscape phone plan view spent too much height on the camera toolbar. | Move its three plan controls to the side and expand the drawing viewport; widen the narrow-phone plan selector. |
 
+| 30 | New 3D room labels could flash at the viewport origin before the next animation frame, including in 2D fallback. | Hide new labels until projected and hide their entire layer outside cutaway mode. |
+
 ## Drawing questions and remaining design work
 
 These cannot be resolved faithfully from the two photographs alone. They are documented, not silently invented.
