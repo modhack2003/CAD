@@ -75,3 +75,11 @@ The exterior now opens with tall glazed bays, warm ivory cladding, bronze accent
 On a phone, open the menu for floors, rooms, layers and appearance. Camera shortcuts sit in a scrollable bottom toolbar. Drag to orbit and pinch to zoom; in Walk inside, drag to look and hold the arrow buttons to move. The controls adapt to portrait, landscape and display cutouts. The drawer closes with its close button, the backdrop or Escape.
 
 The test command includes portrait camera framing and drawer keyboard/focus checks alongside the building geometry regressions. The mobile layout was reviewed at 320 × 568, 390 × 844 and 844 × 390, including floor switching, the controls drawer and source/export dialogs. The review browser has WebGL disabled, so live 3D rendering and physical-device touch gestures still need a device check.
+
+## Plan A and Plan B
+
+Use the **Building plan** selector in the header to switch alternatives. `?plan=A` opens drawing 218129; `?plan=B` opens drawing 218124. The last selection is remembered on your device. Room lists, floor plans, model geometry, source readings and OBJ/SVG/JSON/snapshot exports follow the selected plan. Local reference photos are kept separately for each alternative and are never bundled with the public app.
+
+Plan B uses the printed 16.740 × 13.951 m main block. It has an 8′ × 12′ rear-left room, three 4′ × 6′ toilet compartments, separate urinal and hand-wash areas, two front rooms with unspecified uses, and one front stair. The left front room is labeled 6.000 × 2.450 m. The other room width and door positions are inferred.
+
+The front projection dimensions conflict: 4.600 m on the right versus approximately 3.773 m on the left. Plan B provisionally uses 4.600 m, clearly marked in the source review, SVG and JSON. As with Plan A, the first floor is an assumed repeat because only one floor drawing was supplied. A net hall area is not asserted for Plan B.
