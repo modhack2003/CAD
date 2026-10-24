@@ -1,5 +1,7 @@
 # Two-plan audit — 23 October 2026
 
+> Stair update: the two-flight front-stair interpretation, projection readings and feasibility conclusions below are historical and superseded by [STAIR_CORRECTION.md](STAIR_CORRECTION.md). Both front stairs now use three flights and two landings.
+
 Compared the supplied photographs of drawing 218129 (Plan A) and 218124 (Plan B) with the model, exported geometry, annotated plans and controls. This is the findings register for this review, not a guarantee that all architectural or browser issues have been eliminated.
 
 ## Corrected in this PR

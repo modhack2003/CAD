@@ -37,26 +37,24 @@ The app can also be served from `dist/` with any static HTTP server. The import 
 
 ## Model interpretation
 
-Both plans use the **printed 16.740 m (54′11″) main-block width** and the printed 13.951 m depth. The front-right projection is **3.7226 m (12′2½″)**, read from the 3722.57 mm annotation. The wider 18.540 m top dimension is treated as a site dimension. The rear stair follows the L-shaped footprint.
+Both plans use the **printed 16.740 m (54′11″) main-block width** and the printed 13.951 m depth. Plan B retains the printed **4.600 m** projection; Plan A uses a **provisional ~4.85 m photo trace** because its left-side partial annotation does not span the whole projection. The wider 18.540 m top dimension is treated as a site dimension. The rear stair follows the L-shaped footprint.
 
-Two printed dimensions genuinely conflict, and both are surfaced in **Source & assumptions**, on the exported sheet and in the JSON:
+Dimension uncertainties are surfaced in **Source & assumptions**, on the exported sheet and in the JSON:
 
 - **16.740 m outer width vs. the 54′1″ hall label.** With 230 mm walls, 16.740 m gives a 16.280 m (53′5″) clear hall — about 205 mm short of the label. The outer width is used; 54′1″ is treated as a drawing label, not a measured span.
-- **Plan B front projection:** 4.600 m on the right against about 3.7226 m on the left. 4.600 m is used provisionally.
+- **Projection references:** the shorter left-side annotations start below the hall wall. They are not interchangeable with full projection dimensions. Wall-face references and Plan A full depth need confirmation.
 
 Toilet compartments, rooms and column bays are set out from their printed clear dimensions, shared between the 3D model, the walk-collision set and the 2D sheet so they cannot drift apart.
 
 Only one floor plan was supplied. Floor heights, first-floor layout, openings, elevations, roof and furnishing need design verification. No north orientation or structural design is asserted. OBJ and DXF are geometry, not parametric CAD.
 
-### The stair is diagrammatic, and the app says so
+### Three-flight front stairs
 
-The drawn front projection **cannot contain a stair with a compliant going at any storey height in the slider range.** Rather than hide that:
+Both drawings show **three flights and two quarter-turn landings**: across the bottom toward the left, up the left side, then across the top toward the right. The previous two-flight reconstruction was wrong. The meshes, first-floor opening, guards, walk surface, SVG and DXF now share this layout.
 
-- Riser count follows the storey height, so the rise never exceeds 190 mm (previously a 4.5 m storey produced a 225 mm riser).
-- The going is limited by the drawn well depth and cannot be fixed in software. Plan A yields about 172 mm against a 250 mm target; Plan B about 247 mm, which is marginal.
-- Treads render **amber** when the going is below target, the sidebar reports the well-depth shortfall live, and the figures appear in the SVG sheet, the DXF and the JSON specification.
+Plan B preserves the printed **4.600 m projection**, **4.365 m clear span beside the stair**, **1.825 m hall opening**, **2.540 m right return**, and **1.800 m entrance opening**. The trace-derived flight widths (A: 1.20 m; B: 1.65 m), Plan A full projection, and riser distribution remain provisional. Heights are controlled by the existing conceptual storey-height slider; no stair section was provided.
 
-Fixing this properly means relocating the stair or deepening the projection — an architect's decision, not a code change. A single stair serving a first-floor assembly space, and the absence of any lift or ramp, are also recorded as unresolved design questions.
+[The stair correction and dimension register](docs/STAIR_CORRECTION.md) separates printed measurements from estimates. Earlier claims that Plan A's drawn stair could not fit a usable going are withdrawn: they evaluated the wrong two-flight arrangement. Live per-flight goings and rise are diagnostics, not a construction or compliance assessment.
 
 ## Verification — first build
 
@@ -105,7 +103,7 @@ Use the **Building plan** selector in the header to switch alternatives. `?plan=
 
 Plan B uses the printed 16.740 × 13.951 m main block. It has an 8′ × 12′ rear-left room, three 4′ × 6′ toilet compartments, separate urinal and hand-wash areas, two front rooms with unspecified uses, and one front stair. The left front room is labeled 6.000 × 2.450 m. The other room width and door positions are inferred.
 
-The front projection dimensions conflict: 4.600 m on the right versus approximately 3.7226 m (12′2½″) on the left. Plan B provisionally uses 4.600 m, clearly marked in the source review, SVG and JSON. As with Plan A, the first floor is an assumed repeat because only one floor drawing was supplied. A net hall area is not asserted for Plan B.
+The full right-side projection is 4.600 m. The shorter left-side 3722.57 mm annotation starts at a different point, so it is not treated as a competing full depth. Wall-face references still require confirmation. The first floor is an assumed repeat because only one floor drawing was supplied. No net hall area is asserted for Plan B.
 
 ## Two-plan audit
 
@@ -122,9 +120,7 @@ This round closes the items left open after the two-plan audit. `REVIEW.md` reco
 
 ### Drawing fidelity
 
-- **Front projection corrected** from 3.773 m (12′4½″) to **3.7226 m (12′2½″)**. The annotation reads
-  3722.57 mm; the old value looks like 3722 transposed as 3772. The correction propagates to the slab outline,
-  the SVG, the DXF, the OBJ and the JSON.
+- **Projection interpretation superseded by the three-flight correction.** The earlier 3.7226 m overall projection treated a partial annotation as the full depth. See the current dimension register above.
 - **Plan A now uses the printed 16.740 m width** instead of an inferred ~16.94 m. Drawing 218124 prints the
   width for the same building, so the inference was superseded — and the two plans no longer model one
   building 200 mm apart.

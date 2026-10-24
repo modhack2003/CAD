@@ -1,7 +1,8 @@
+import {frontStairLayout,frontStairSurface,frontStairLines,flightBounds} from './front-stair.js';
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { responsiveFov, setupDrawer } from './mobile-ui.js';
-import {plans,planColumns,planShell,planFixtures,planLabels,planRails,planSheet,planSheetNotes,stairMetrics,flightRisers,goingBand,LANDING,TARGET_GOING,PLAN_VIEWBOX} from './plans.js';
+import {plans,planColumns,planShell,planFixtures,planLabels,planRails,planSheet,planSheetNotes,flightRisers,goingBand,PLAN_VIEWBOX} from './plans.js';
 
 const $=id=>document.getElementById(id);
 const touchDevice=window.matchMedia('(pointer:coarse)').matches;
@@ -50,7 +51,7 @@ function slab(g,y,holes=false,roof=false){const shape=new THREE.Shape();shape.mo
 // Each opening is a genuine gap, with lintel and sill constructed around it.
 function wall(g,name,axis,a,b,c,h,openings=[],outer=false,cut=false){let cursor=a;const thick=outer?T:.14;const material=mats[outer?'wall':'partition'];const group=new THREE.Group();group.name=name;group.userData={kind:'wall',cut};g.add(group);const add=(s,e,y,ht)=>{if(e-s<.005||ht<.005)return;const x=axis==='x'?(s+e)/2:c,z=axis==='x'?c:(s+e)/2;const m=box(group,name,x,y,z,axis==='x'?e-s:thick,ht,axis==='x'?thick:e-s,material,'wall');colliders.push({floor:g.userData.level,axis,a:s,b:e,c,yMin:y-ht/2,yMax:y+ht/2,thick})};for(const o of [...openings].sort((a,b)=>a.a-b.a)){openingsDrawn.push({floor:g.userData.level,axis,c,...o});add(cursor,o.a,h/2,h);const sill=o.window?(o.sill??(o.tall?.24:.92)):0,head=o.window?(o.head??(o.tall?h-.22:2.42)):2.38;add(o.a,o.b,sill/2,sill);add(o.a,o.b,(head+h)/2,h-head);if(o.window){colliders.push({floor:g.userData.level,axis,a:o.a,b:o.b,c,yMin:sill,yMax:head,thick});const x=axis==='x'?(o.a+o.b)/2:c,z=axis==='x'?c:(o.a+o.b)/2,w=o.b-o.a,cy=(sill+head)/2,gh=head-sill;box(group,o.tall?'Tall banquet glazing':'Assumed window glass',x,cy,z,axis==='x'?w:.04,gh,axis==='x'?.04:w,mats.glass,'window');[o.a,o.b,(o.a+o.b)/2].forEach(p=>box(group,'Window frame',axis==='x'?p:c,cy,axis==='x'?c:p,axis==='x'?.045:.06,gh+.04,axis==='x'?.06:.045,mats.metal,'window'));[sill,head].forEach(y=>box(group,'Window frame',x,y,z,axis==='x'?w:.06,.045,axis==='x'?.06:w,mats.metal,'window'))}else if(o.door){const w=o.b-o.a;const pivot=new THREE.Group();pivot.position.set(axis==='x'?o.a:c,0,axis==='x'?c:o.a);pivot.rotation.y=axis==='x'?(o.inward?Math.PI*.34:-Math.PI*.34):-Math.PI/2-Math.PI*.16;box(pivot,'Open door leaf',w/2,1.17,0,w,2.34,.045,o.glazed?mats.glass:mats.wood,'door');if(o.glazed){for(const edge of [0,w])box(pivot,'Bronze entrance stile',edge,1.17,0,.065,2.34,.065,exteriorMats.bronze,'door');for(const y of [.035,2.305])box(pivot,'Bronze entrance rail',w/2,y,0,w,.07,.065,exteriorMats.bronze,'door');box(pivot,'Entrance pull handle',w-.16,1.15,.08,.035,.62,.035,exteriorMats.bronze,'door')}pivot.userData.kind='doorAssembly';group.add(pivot);for(const edge of [o.a,o.b])box(group,'Door jamb',axis==='x'?edge:c,1.19,axis==='x'?c:edge,axis==='x'?.07:thick+.025,2.38,axis==='x'?thick+.025:.07,mats.wood,'door');box(group,'Door frame header',axis==='x'?(o.a+o.b)/2:c,2.38,axis==='x'?c:(o.a+o.b)/2,axis==='x'?w+.07:thick+.025,.07,axis==='x'?thick+.025:w+.07,mats.wood,'door');box(group,'Door threshold',axis==='x'?(o.a+o.b)/2:c,.012,axis==='x'?c:(o.a+o.b)/2,axis==='x'?w:.22,.024,axis==='x'?.22:w,mats.stone,'door')}cursor=o.b;}add(cursor,b,h/2,h);return group}
 function toilet(g,x,z){const base=box(g,'WC pedestal',x,.22,z,.35,.44,.5,mats.sanitary,'furniture');const seat=new THREE.Mesh(new THREE.TorusGeometry(.21,.065,8,22),mats.sanitary);seat.rotation.x=Math.PI/2;seat.scale.y=1.3;seat.position.set(x,.48,z+.04);seat.name='Toilet seat';seat.userData.kind='furniture';g.add(seat);modelObjects.push(seat);box(g,'WC cistern',x,.66,z-.26,.44,.5,.15,mats.sanitary,'furniture')}
-function rail(g,x1,z1,x2,z2,y1,y2){const n=Math.max(2,Math.ceil(Math.hypot(x2-x1,z2-z1)/.5)),rise=stairMetrics(plan.stair.depth,state.height).rise;for(let i=0;i<=n;i++){const t=i/n,top=y1+(y2-y1)*t+1,base=y1===y2?y1:Math.floor((y1+(y2-y1)*t)/rise)*rise;box(g,'Baluster',x1+(x2-x1)*t,(base+top)/2,z1+(z2-z1)*t,.035,top-base,.035,mats.metal)}const from=new THREE.Vector3(x1,y1+1,z1),to=new THREE.Vector3(x2,y2+1,z2),v=to.clone().sub(from);const m=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,v.length(),8),mats.metal);m.position.copy(from).add(to).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());m.name='Stair handrail';g.add(m);modelObjects.push(m)}
+function rail(g,x1,z1,x2,z2,y1,y2){const n=Math.max(2,Math.ceil(Math.hypot(x2-x1,z2-z1)/.5)),rise=frontStairLayout(plan,state.height).rise;for(let i=0;i<=n;i++){const t=i/n,top=y1+(y2-y1)*t+1,base=y1===y2?y1:Math.floor((y1+(y2-y1)*t)/rise)*rise;box(g,'Baluster',x1+(x2-x1)*t,(base+top)/2,z1+(z2-z1)*t,.035,top-base,.035,mats.metal)}const from=new THREE.Vector3(x1,y1+1,z1),to=new THREE.Vector3(x2,y2+1,z2),v=to.clone().sub(from);const m=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,v.length(),8),mats.metal);m.position.copy(from).add(to).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());m.name='Stair handrail';g.add(m);modelObjects.push(m)}
 function stairWaist(g,name,c,start,end,y0,y1,width,alongX=false){
  const length=Math.hypot(end-start,y1-y0),m=box(g,name,alongX?(start+end)/2:c,(y0+y1)/2-.12,alongX?c:(start+end)/2,alongX?length:width,.24,alongX?width:length,mats.stone);
  if(alongX)m.rotation.z=Math.atan2(y1-y0,end-start);else m.rotation.x=-Math.atan2(y1-y0,end-start);
@@ -59,7 +60,22 @@ function stairWaist(g,name,c,start,end,y0,y1,width,alongX=false){
 // Where the drawn well is too shallow for a usable going the treads are tinted as
 // diagrammatic rather than quietly presented as buildable.
 function treadMaterial(going){return goingBand(going)==='meets'?mats.stone:mats.diagram}
-function stairs(g,x,z,w,depth,h,name){const sm=stairMetrics(depth,h),n=sm.perFlight,run=sm.going,tm=treadMaterial(run);for(let i=0;i<n;i++){box(g,name+' lower flight',x+w*.25,(i+1)*h/4/n,z+depth-(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm);box(g,name+' upper flight',x+w*.75,h/2+(i+1)*h/4/n,z+LANDING+(i+.5)*run,w*.49,(i+1)*h/2/n,run,tm)}stairWaist(g,name+' upper waist',x+w*.75,z+LANDING,z+depth,h/2,h,w*.49);box(g,name+' mid landing',x+w/2,h/2-.09,z+LANDING/2,w,.18,LANDING,mats.stone);rail(g,x+.04,z+depth,x+.04,z+LANDING,0,h/2);rail(g,x+w-.04,z+LANDING,x+w-.04,z+depth,h/2,h);rail(g,x+.04,z+.05,x+w-.04,z+.05,h/2,h/2)}
+function stairs(g,h,name){const st=frontStairLayout(plan,h);
+ for(const f of st.flights){const tm=treadMaterial(f.going),dir=Math.sign(f.end-f.start);
+  for(let i=0;i<f.count;i++){const p=f.start+dir*(i+.5)*f.going,y=f.y0+(i+1)*st.rise;
+   const tread=box(g,name+' '+f.name+' flight',f.axis==='x'?p:f.c,y-.06,f.axis==='x'?f.c:p,f.axis==='x'?f.going:f.width,.12,f.axis==='x'?f.width:f.going,tm);
+   tread.userData.frontFlight=f.id;
+  }
+  stairWaist(g,name+' '+f.name+' waist',f.c,f.start,f.end,f.y0,f.y1,f.width,f.axis==='x');
+  for(const side of [-1,1]){const c=f.c+side*(f.width/2-.04);
+   rail(g,f.axis==='x'?f.start:c,f.axis==='x'?c:f.start,f.axis==='x'?f.end:c,f.axis==='x'?c:f.end,f.y0,f.y1);
+  }
+ }
+ for(const l of st.landings){box(g,name+' landing '+l.id,l.x+l.width/2,l.y-.09,l.z+l.depth/2,l.width,.18,l.depth,mats.stone);
+  rail(g,l.x+.04,l.z,l.x+.04,l.z+l.depth,l.y,l.y);
+  const edge=l.id===1?l.z+l.depth-.04:l.z+.04;rail(g,l.x,edge,l.x+l.width,edge,l.y,l.y);
+ }
+}
 
 function rearStairs(g,h){const n=flightRisers(h),tm=treadMaterial(1.85/n);for(let i=0;i<n;i++){box(g,'Rear L stair lower flight',12.275,(i+1)*h/4/n,3.35-(i+.5)*1.85/n,1.25,(i+1)*h/2/n,1.85/n,tm);box(g,'Rear L stair upper flight',12.9+(i+.5)*2.3/n,h/2+(i+1)*h/4/n,.875,2.3/n,(i+1)*h/2/n,1.25,tm)}stairWaist(g,'Rear upper waist',.875,12.9,15.2,h/2,h,1.25,true);box(g,'Rear quarter-turn landing',12.275,h/2-.09,.875,1.25,.18,1.25,mats.stone);rail(g,11.7,3.35,11.7,1.5,0,h/2);rail(g,11.7,.3,12.9,.3,h/2,h/2);rail(g,12.9,.3,15.2,.3,h/2,h)}
 function deskSet(f,x,z){box(f,'Room desk',x,.75,z,1.5,.09,.7,mats.wood,'furniture');for(const dx of [-.65,.65])box(f,'Desk leg',x+dx,.36,z,.06,.72,.5,mats.metal,'furniture');box(f,'Chair seat',x,.48,z+.65,.48,.1,.48,mats.seat,'furniture');box(f,'Chair back',x,.78,z+.87,.48,.55,.06,mats.seat,'furniture');for(const dx of [-.18,.18])for(const dz of [-.18,.18])box(f,'Chair leg',x+dx,.215,z+.65+dz,.045,.43,.045,mats.metal,'furniture')}
@@ -98,10 +114,14 @@ function banquetFacade(g,level,h){
 
 function fillList(id,items){const el=$(id);el.textContent='';for(const text of items){const li=document.createElement('li');li.textContent=text;el.append(li)}}
 function fillRows(id,rows){const el=$(id);el.textContent='';for(const [k,v] of rows){const tr=document.createElement('tr');for(const value of [k,v]){const td=document.createElement('td');td.textContent=value;tr.append(td)}el.append(tr)}}
-function stairReview(){const st=plan.stair,sm=stairMetrics(st.depth,state.height);
- return {front:{risers:sm.risers,rise:sm.rise,tread:sm.going,wellDepth:st.depth,requiredWellDepth:sm.requiredDepth,shortfall:sm.shortfall,band:sm.band,verdict:sm.verdict,upperLandingClear:D+E-T/2-(st.z+st.depth)},
-  rear:plan.rearStair?{risers:sm.risers,rise:sm.rise,lowerTread:1.85/sm.perFlight,upperTread:2.3/sm.perFlight}:null,
-  status:'Concept only. Risers are capped at 190 mm by raising the riser count; the going is limited by the drawn well depth and cannot be fixed without redesign. Verify treads, risers, headroom, handrails, accessibility and evacuation with an architect.'}}
+function stairReview(){const st=frontStairLayout(plan,state.height),band=goingBand(st.going),rearN=flightRisers(state.height);
+ return {front:{flights:st.flights.map(f=>({number:f.id,direction:f.axis+(f.end>f.start?'+':'-'),risers:f.count,going:f.going,width:f.width,from:f.y0,to:f.y1})),landings:st.landings,
+  risers:st.risers,rise:st.rise,tread:st.going,wellDepth:st.depth,shortfall:st.shortfall,band,
+  verdict:band==='meets'?'meets the 250 mm going target; dimensions unverified':band==='marginal'?'marginal going; dimensions unverified':'diagrammatic going; dimensions unverified',
+  upperLandingClear:W-T/2-(st.x+st.width),dimensionalStatus:st.dimensionalStatus},
+  rear:plan.rearStair?{risers:rearN*2,rise:state.height/(rearN*2),lowerTread:1.85/rearN,upperTread:2.3/rearN}:null,
+  status:'Three-flight front stair traced from the photograph. Printed dimensions and estimates are distinguished in the source notes. No stair section or floor heights supplied; verify headroom, landings, guards and structure.'}}
+
 function refreshPlanUI(){
  $('planSelect').value=plan.id;$('projectDrawing').textContent=plan.name+' · Drawing '+plan.drawing+' · G + 1';
  $('planDescription').textContent=plan.tagline;
@@ -139,7 +159,7 @@ for(const [name,axis,a,b,c,openings,outer,cut] of planShell(plan,level))wall(g,n
 for(const [x,z] of columnPoints())box(g,'Column',x,h/2,z,columnSize(),h,columnSize(),mats.stone);
 for(const x of [EX+.11,12.72,W-.11])box(g,'Entrance column',x,h/2,D+E-.11,.28,h,.28,mats.stone);
 const st=plan.stair;
-if(level===0){if(plan.rearStair)rearStairs(g,state.height);stairs(g,st.x,st.z,st.width,st.depth,state.height,'Front stair')}
+if(level===0){if(plan.rearStair)rearStairs(g,state.height);stairs(g,state.height,'Front stair')}
 else for(const [x1,z1,x2,z2] of planRails(plan))rail(g,x1,z1,x2,z2,0,0);
 banquetFacade(g,level,h);
 g.userData.fixtures=buildFixtures(g);
@@ -197,7 +217,7 @@ const upperY=state.height+explodedOffset(),baseY=state.floor==='1'?upperY:0,spre
 interiorLights.forEach((l,i)=>{const point=points[i];
  if(!point||state.mode==='plan'){l.intensity=0;return}
  l.position.set(point[0],(spread&&i%2?upperY:baseY)+state.height-.45,point[1]);l.intensity=lit});
-roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&(state.mode==='walk'||state.floor!=='0')&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='Front stair: '+Math.round(sr.rise*1000)+' mm rise / '+Math.round(sr.tread*1000)+' mm going · '+sr.upperLandingClear.toFixed(2)+' m upper landing. '+({meets:'Meets the '+Math.round(TARGET_GOING*1000)+' mm going target; headroom and width still need review.',marginal:'Going is marginally under the '+Math.round(TARGET_GOING*1000)+' mm target — the well is '+sr.shortfall.toFixed(2)+' m short. Treads are tinted as unverified.',diagrammatic:'Well is '+sr.shortfall.toFixed(2)+' m too shallow for a '+Math.round(TARGET_GOING*1000)+' mm going — amber treads are diagrammatic.'}[sr.band]);$('stairReview').classList.toggle('warn',sr.band!=='meets');$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
+roofGroup.position.y=state.height*2+explodedOffset();roofGroup.visible=state.roof&&(state.mode==='walk'||state.floor!=='0')&&state.mode!=='plan';grid.visible=state.grid;globalClip.constant=state.section===100?100:(D+E)*state.section/100;$('explodeOut').textContent=explodedOffset()>0?explodedOffset().toFixed(1)+' m':'Assembled';$('heightOut').textContent=state.height.toFixed(1)+' m';const sr=stairReview().front;$('stairReview').textContent='3 flights · 2 landings · '+Math.round(sr.rise*1000)+' mm rise · goings '+sr.flights.map(f=>Math.round(f.going*1000)).join(' / ')+' mm. '+sr.dimensionalStatus;$('stairReview').classList.toggle('warn',true);$('sectionOut').textContent=state.section===100?'Full':Math.round(state.section)+'%';document.querySelectorAll('[data-floor]').forEach(b=>b.classList.toggle('active',b.dataset.floor===state.floor));document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.mode));$('walkControls').hidden=state.mode!=='walk';$('planView').hidden=state.mode!=='plan';canvas.style.visibility=state.mode==='plan'?'hidden':'visible';$('explode').disabled=state.mode!=='cutaway'||state.floor!=='both';$('roof').disabled=state.mode==='plan';for(const id of ['labels','dimensions','furniture','grid','section','style','light'])$(id).disabled=state.mode==='plan';
 // Room labels only read inside the cutaway, so the toggle says so instead of doing nothing.
 $('labels').disabled=state.mode!=='cutaway';$('dimensions').disabled=state.mode==='plan'||state.mode==='walk';
 for(const id of ['bird','top','front','rotate'])$(id).disabled=!webglAvailable;document.querySelectorAll('[data-mode]').forEach(b=>{b.disabled=!webglAvailable&&b.dataset.mode!=='plan';b.setAttribute('aria-pressed',String(b.dataset.mode===state.mode))});document.querySelectorAll('[data-floor]').forEach(b=>{b.disabled=state.mode==='plan'&&b.dataset.floor==='both';b.setAttribute('aria-pressed',String(b.dataset.floor===state.floor))});$('viewChip').innerHTML='<i></i>'+(!webglAvailable?'2D · NO WEBGL':({walk:'INTERIOR',plan:'2D PLAN',cutaway:explodedOffset()>0?'EXPLODED VIEW':state.floor==='both'?'ASSEMBLED 3D':'ISOLATED FLOOR',exterior:'ASSEMBLED 3D'}[state.mode]));$('viewTitle').textContent={cutaway:'A new perspective.',exterior:'Outside, all around.',walk:'Step into the space.',plan:'Every line has a place.'}[state.mode];$('interactionHint').textContent=!webglAvailable?'2D fallback · drag to pan · pinch / + − to zoom':state.mode==='walk'?(touchDevice?'Drag to look · Hold arrows to walk':'Drag to look · WASD to move'):state.mode==='plan'?'Drag to pan · pinch / scroll / + − to zoom · Fit to reset':(touchDevice?'Drag to orbit · Pinch to zoom':'Drag to orbit · Scroll to zoom · Right-drag to pan');document.querySelector('.walk-hint').textContent=touchDevice?'Drag to look · Hold arrows to walk · the stairs carry you between floors':'Drag to look · WASD / arrows to move · Q and E turn · walk up the stairs to change floor';$('compass').hidden=state.mode==='walk';$('spaceCard').style.display=state.mode==='plan'?'none':'';if(state.mode==='plan')renderPlan();invalidate();syncURL();}
@@ -290,7 +310,7 @@ function svgAnnotations(floorLabel,footnotes=[]){
 // and the 3D model cannot describe different buildings.
 function svgPlan(highlight=''){
  const upper=state.floor==='1',floor=upper?'FIRST FLOOR · ASSUMED REPEAT':'GROUND FLOOR';
- const st=plan.stair,sm=stairMetrics(st.depth,state.height),parts=[];
+ const st=frontStairLayout(plan,state.height),sm={...st,band:goingBand(st.going)},parts=[];
  const rect=(x,z,w,d,fill,stroke='none',sw=.035)=>`<rect x="${+x}" y="${+z}" width="${+w}" height="${+d}" fill="${svgColour(fill)}" stroke="${svgColour(stroke)}" stroke-width="${+sw}"/>`;
  parts.push(`<path d="M0 0H${W}V${D+E}H${EX}V${D}H0Z" fill="#f8f7ec" stroke="#3f5747" stroke-width=".15"/>`);
  for(const item of planSheet(plan,upper)){
@@ -300,9 +320,11 @@ function svgPlan(highlight=''){
   else if(item[0]==='vtext')parts.push(`<text x="${item[1]}" y="${item[2]}" transform="rotate(-90 ${item[1]} ${item[2]})" text-anchor="middle" font-size="${item[4]}" fill="#42604a" font-family="Arial,sans-serif">${xmlText(item[3])}</text>`);
   else parts.push(`<path d="${svgPath(item[1])}" fill="${svgColour(item[2])}" stroke="${svgColour(item[3])}" stroke-width="${+item[4]}"/>`);
  }
- parts.push(rect(st.x,st.z,st.width,st.depth,sm.band==='meets'?'#d9ddcf':'#efdcc0','#71836b',.03));
- for(let i=0;i<sm.perFlight;i++)parts.push(`<path d="M${st.x} ${st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight}h${st.width}" fill="none" stroke="#71836b" stroke-width=".03"/>`);
- parts.push(`<path d="M${st.x+st.width/2} ${st.z+LANDING}v${st.depth-LANDING}" fill="none" stroke="#71836b" stroke-width=".05"/>`);
+ for(const f of st.flights){const b=flightBounds(f);parts.push(`<g data-front-flight="${f.id}">${rect(b.x,b.z,b.width,b.depth,goingBand(f.going)==='meets'?'#d9ddcf':'#efdcc0')}</g>`)}
+ for(const l of st.landings)parts.push(`<g data-front-landing="${l.id}">${rect(l.x,l.z,l.width,l.depth,'#d9ddcf','#71836b',.03)}</g>`);
+ for(const [x1,z1,x2,z2,flightId] of frontStairLines(st))parts.push(`<path d="M${x1} ${z1}L${x2} ${z2}" fill="none" stroke="#71836b" stroke-width=".03"${!upper&&flightId>1?' stroke-dasharray=".09 .09"':''}/>`);
+ parts.push(svgText(st.x+st.width+.25,st.z+st.depth/2,'3 FLIGHTS',.18));
+
  for(const c of colliders.filter(c=>c.floor===(upper?1:0)&&c.yMin<.1&&c.yMax>2))parts.push(rect(c.axis==='x'?c.a:c.c-c.thick/2,c.axis==='x'?c.c-c.thick/2:c.a,c.axis==='x'?c.b-c.a:c.thick,c.axis==='x'?c.thick:c.b-c.a,'#536556'));
  for(const [x,z] of columnPoints())parts.push(rect(x-columnSize()/2,z-columnSize()/2,columnSize(),columnSize(),'#3c5944'));
  const [vx,vy,vw,vh]=PLAN_VIEWBOX;
@@ -374,9 +396,8 @@ function dxfPlan(){
   const start=Math.atan2(-(lz-az),lx-ax)*180/Math.PI,end=Math.atan2(-(bz-az),bx-ax)*180/Math.PI;
   arc('A-DOOR',ax,az,w,Math.min(start,end),Math.max(start,end));
  }
- const st=plan.stair,sm=stairMetrics(st.depth,state.height);
- rect('A-STRS',st.x,st.z,st.width,st.depth);
- for(let i=0;i<sm.perFlight;i++)line('A-STRS',st.x,st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight,st.x+st.width,st.z+LANDING+i*(st.depth-LANDING)/sm.perFlight);
+ const st=frontStairLayout(plan,state.height),sm=st;
+ for(const [x1,z1,x2,z2] of frontStairLines(st))line('A-STRS',x1,z1,x2,z2);
  // The L-shaped rear well, matching the slab hole and the SVG sheet. A plain
  // rectangle here would have shown CAD users a different stair.
  if(plan.rearStair){
@@ -389,7 +410,7 @@ function dxfPlan(){
  for(let i=0;i<bays.length-1;i++){line('A-GRID',bays[i],-2,bays[i+1],-2);text('A-ANNO',(bays[i]+bays[i+1])/2-.4,-2.3,.24,(bays[i+1]-bays[i]).toFixed(3))}
  text('A-ANNO',0,D+E+1.6,.4,'PLAN ATLAS - DRAWING '+plan.drawing+' - '+plan.name);
  text('A-ANNO',0,D+E+2.2,.26,(level?'FIRST FLOOR (ASSUMED REPEAT)':'GROUND FLOOR')+' - CONCEPT, NOT A CONSTRUCTION DRAWING');
- text('A-ANNO',0,D+E+2.7,.26,'Stair is diagrammatic: '+Math.round(sm.going*1000)+' mm going, needs '+sm.requiredDepth.toFixed(2)+' m well depth');
+ text('A-ANNO',0,D+E+2.7,.26,'3 flights, 2 landings; minimum going '+Math.round(sm.going*1000)+' mm; traced dimensions require verification');
  p(0,'ENDSEC');p(0,'EOF');
  return out.join('\r\n')+'\r\n';
 }
@@ -501,12 +522,8 @@ function safeWalkTarget(r){
 // function gives stair traversal and the upper-void block: a point on a flight
 // is only reachable when its surface is near the walker's current elevation.
 function stairSurface(x,z){
- const st=plan.stair,h=state.height,pad=.04,run=st.depth-LANDING;
- if(x>=st.x-pad&&x<=st.x+st.width+pad&&z>=st.z-pad&&z<=st.z+st.depth+pad){
-  if(z<=st.z+LANDING)return h/2;
-  const t=Math.max(0,Math.min(1,(z-(st.z+LANDING))/run));
-  return x<=st.x+st.width/2?h/2*(1-t):h/2*(1+t);
- }
+ const st=frontStairLayout(plan,state.height),h=state.height,pad=.04;
+ const front=frontStairSurface(st,x,z);if(front!==null)return front;
  if(plan.rearStair&&x>=11.65-pad&&x<=15.2+pad&&z>=.25-pad&&z<=3.35+pad){
   if(x<=12.9)return z>=1.5?h/2*Math.max(0,Math.min(1,(3.35-z)/1.85)):h/2;
   if(z<=1.5)return h/2*(1+Math.max(0,Math.min(1,(x-12.9)/2.3)));
@@ -516,7 +533,8 @@ function stairSurface(x,z){
 const STEP=.3;
 function walkElevation(){return state.mode==='walk'&&stairSurface(camera.position.x,camera.position.z)!==null?walkY:floorY()}
 function canWalk(x,z,y=walkElevation()){if(x<.35||x>W-.35||z<.35||z>D+E-.35||(x<EX+.3&&z>D-.35))return false;
- const surface=stairSurface(x,z);
+ const surface=stairSurface(x,z),st=plan.stair;
+ if(Math.abs(y-state.height)<STEP&&surface===null&&x>st.x&&x<st.x+st.width&&z>st.z&&z<st.z+st.depth)return false;
  if(surface!==null){
   // STEP bounds both the climb and the void block. Legitimate movement changes
   // the surface by at most ~0.12 m per frame, so this permits walking up while

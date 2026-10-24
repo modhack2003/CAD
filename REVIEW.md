@@ -1,5 +1,7 @@
 # Plan Atlas — code, deployment and drawing review
 
+> Stair update: the two-flight front-stair interpretation, projection readings and feasibility conclusions below are historical and superseded by [STAIR_CORRECTION.md](docs/STAIR_CORRECTION.md). Both front stairs now use three flights and two landings.
+
 > **Status: all findings addressed.** §§4–10 were fixed first (README → "Review round 3"), then the four
 > items that had been deferred — walkthrough stair traversal, camera fitting, glTF export and the full
 > data-driven refactor of §11 — were completed (README → "Round 4"). The one recommendation **not** taken is

@@ -4,7 +4,8 @@ import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {responsiveFov} from '../dist/mobile-ui.js';
-import {PLAN_VIEWBOX,planSheetNotes,planAGrid,goingBand,LANDING} from '../dist/plans.js';
+import {frontStairLayout,flightBounds} from '../dist/front-stair.js';
+import {PLAN_VIEWBOX,planSheetNotes,planAGrid,goingBand} from '../dist/plans.js';
 const root=fileURLToPath(new URL('../dist/',import.meta.url));
 const temp=await fs.mkdtemp(path.join(tmpdir(),'plan-atlas-test-'));
 const testModule=path.join(temp,'model-under-test.mjs');
@@ -15,8 +16,8 @@ globalThis.window={addEventListener(){},matchMedia(){return {matches:false,addEv
 const downloads=[];URL.createObjectURL=b=>{downloads.push(b);return 'blob:test'};URL.revokeObjectURL=()=>{};
 let source=await fs.readFile(root+'app.js','utf8');
 source=source.replace("from 'three'",`from 'file://${root}vendor/three.module.min.js'`).replace("import { OrbitControls } from './vendor/OrbitControls.js';",`class OrbitControls { constructor(){this.target=new THREE.Vector3()}update(){}addEventListener(){}listenToKeyEvents(){} }`);
-source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`).replace("from './plans.js'",`from 'file://${root}plans.js'`).replace("from './plan-navigation.js'",`from 'file://${root}plan-navigation.js'`);
-source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,stairMetrics,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,measureHit,keys,dimGroup,interiorLights,scene,dxfPlan,glbModel,stairSurface,frameRadius,fitDistance,walkY};';
+source=source.replace("from './mobile-ui.js'",`from 'file://${root}mobile-ui.js'`).replace("from './front-stair.js'",`from 'file://${root}front-stair.js'`).replace("from './plans.js'",`from 'file://${root}plans.js'`).replace("from './plan-navigation.js'",`from 'file://${root}plan-navigation.js'`);
+source+='\nexport {model,state,floors,colliders,build,canWalk,update,roofGroup,slab,site,switchPlan,plan,svgPlan,rooms,stairReview,openingsDrawn,planViewport,camera,focusRoom,clearMeasure,measureGroup,measureHit,keys,dimGroup,interiorLights,scene,dxfPlan,glbModel,stairSurface,frameRadius,fitDistance,walkY};';
 await fs.writeFile(testModule,source);
 const m=await import(testModule);
 assert.equal(document.getElementById('labelLayer').hidden,true,'2D fallback hides unprojected 3D labels');assert.equal(m.floors.length,2);let vertices=0,meshes=0;for(const f of m.floors)f.traverse(o=>{if(!o.isMesh)return;meshes++;const p=o.geometry.attributes.position;vertices+=p.count;for(const x of p.array)assert.ok(Number.isFinite(x),'non-finite geometry')});
@@ -72,13 +73,13 @@ console.log('Banquet checks passed: glazing at height limits, glass collision, s
 m.switchPlan('B',false);assert.equal(m.plan.drawing,'218124');assert.equal(m.floors.length,2);
 const count=(group,name)=>{let n=0;group.traverse(o=>{if(o.name===name)n++});return n};
 for(const floor of m.floors){assert.equal(count(floor,'WC pedestal'),3);assert.equal(count(floor,'Urinal fixture'),3);assert.ok(floor.getObjectByName('Plan B Front room divider'));assert.ok(!floor.getObjectByName('Rear L stair lower flight'));assert.ok(!floor.getObjectByName('Rear room A / upper WC'));}
-assert.equal(count(m.model,'Front stair lower flight'),10);
+assert.equal(count(m.model,'Front stair lower flight'),7);
 Object.assign(m.state,{floor:'1',mode:'exterior'});m.update();m.model.updateMatrixWorld(true);
 assert.ok(!m.canWalk(10,16),'Plan B front stair void blocks walking');assert.ok(m.canWalk(12.2,2),'Plan B has no phantom rear stair void');
 const bFirst=m.floors[1],bLeaf=bFirst.getObjectByName('First-floor landing entry').getObjectByName('Open door leaf');const bBounds=new THREE.Box3().setFromObject(bLeaf),bSlab=bFirst.children.find(o=>o.name==='Floor slab');
 for(const x of [bBounds.min.x+.04,bBounds.max.x-.04])for(const z of [bBounds.min.z+.04,bBounds.max.z-.04]){ray.set(new THREE.Vector3(x,3.5,z),new THREE.Vector3(0,-1,0));assert.ok(ray.intersectObject(bSlab).length,'Plan B upper doorway supported');}
 const footprint=new THREE.Box3().setFromObject(bSlab);assert.ok(Math.abs(footprint.max.x-16.74)<1e-5);assert.ok(Math.abs(footprint.max.z-18.551)<1e-5);
-const bSvg=m.svgPlan();assert.ok(bSvg.includes('218124'));assert.ok(bSvg.includes('FRONT ROOM 2'));assert.ok(bSvg.includes('3.7226 m'),'corrected 12′2½″ projection reading reaches the sheet');assert.ok(!bSvg.includes('3.773'),'superseded 3.773 m reading is gone');assert.ok(!bSvg.includes('ROOM B'));
+const bSvg=m.svgPlan();assert.ok(bSvg.includes('218124'));assert.ok(bSvg.includes('FRONT ROOM 2'));assert.ok(bSvg.includes('3722.57 mm'),'corrected 12′2½″ projection reading reaches the sheet');assert.ok(!bSvg.includes('3.773'),'superseded 3.773 m reading is gone');assert.ok(!bSvg.includes('ROOM B'));
 document.getElementById('jsonExport').onclick();const spec=JSON.parse(await downloads.at(-1).text());assert.equal(spec.plan,'B');assert.equal(spec.mainBlock.width,16.74);assert.equal(spec.frontExtension.provisional,true);assert.equal(spec.stairs.rear,false);
 document.getElementById('objExport').onclick();const bObj=await downloads.at(-2).text();assert.ok(bObj.includes('drawing 218124'));assert.ok(!/NaN|Infinity/.test(bObj));assert.ok(bObj.includes('Plan_B_Front_room_divider'));assert.ok(!bObj.includes('Rear_L_stair'));
 const bLines=bObj.split('\n'),bVertices=bLines.filter(l=>l.startsWith('v ')).length;for(const line of bLines.filter(l=>l.startsWith('f ')))for(const index of faceIndices(line))assert.ok(index>=1&&index<=bVertices);
@@ -118,9 +119,9 @@ const tally=()=>{let n=0;m.model.traverse(o=>{if(o.isMesh)n++});return n};const 
 // The riser count now tracks storey height, so assert the 190 mm cap holds and that
 // the flight count is the only thing that varies, instead of pinning a fixed total.
 for(const h of [2.8,3.3,4.5]){m.state.height=h;m.build();m.model.traverse(o=>{if(o.isMesh)for(const value of o.geometry.attributes.position.array)assert.ok(Number.isFinite(value))});
- const sm=m.stairMetrics(m.plan.stair.depth,h);assert.ok(sm.rise<=.19+1e-9,'riser stays within 190 mm at '+h+' m storey height');
- assert.equal(count(m.model,'Front stair lower flight'),sm.perFlight,'tread count follows the riser cap');
- assert.equal(tally(),bCount+(sm.perFlight-10)*2,'only the stair flight count varies with height')}
+ const sm=frontStairLayout(m.plan,h);assert.ok(sm.rise<=.19+1e-9,'riser stays within 190 mm at '+h+' m storey height');
+ assert.equal(count(m.model,'Front stair lower flight'),sm.flights[0].count,'tread count follows the riser cap');
+ assert.equal(tally(),bCount+(sm.risers-18),'only the stair flight count varies with height')}
 m.state.height=3.3;m.switchPlan('A',false);assert.equal(count(m.floors[0],'WC pedestal'),4);assert.ok(m.floors[0].getObjectByName('Rear L stair lower flight'));assert.ok(!m.floors[0].getObjectByName('Plan B fixtures'));
 document.getElementById('sourceUpload').onchange({target:{files:[{type:'image/jpeg',size:100}]}});assert.equal(document.getElementById('sourcePreview').hidden,false);m.switchPlan('B',false);assert.equal(document.getElementById('sourcePreview').hidden,true,'Plan A photograph not shown for B');m.switchPlan('A',false);assert.equal(document.getElementById('sourcePreview').hidden,false);
 // Drawing fidelity and interaction regressions found in the two-plan audit.
@@ -147,7 +148,7 @@ assert.ok(Math.abs(bound('Toilet centre divider').min.x-left-1.2192)<1e-5,'left 
 assert.ok(Math.abs(bound('Front room divider').min.x-left-6)<1e-5,'front room clear width is 6 m');
 assert.ok(Math.abs(bound('front room facade').min.z-bound('Front room partitions').max.z-2.45)<1e-5,'front room clear depth is 2.45 m');
 assert.ok(m.stairReview().front.upperLandingClear>=.95,'upper exit has a usable conceptual landing');
-assert.ok(Math.abs(m.stairReview().front.tread-.247)<1e-6);
+assert.ok(Math.abs(m.stairReview().front.tread-(3.597-1.65)/7)<1e-6);
 let materialDisposed=false,geometryDisposed=false;const marker=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());marker.material.addEventListener('dispose',()=>materialDisposed=true);marker.geometry.addEventListener('dispose',()=>geometryDisposed=true);m.measureGroup.add(marker);m.clearMeasure();assert.ok(materialDisposed&&geometryDisposed,'measurement resources disposed');
 console.log('Audit regressions passed: drawing room sizes, column rows, rear entry, stair landing, canopy/paving support, safe walk targets, furniture collision and valid SVG text.');
 
@@ -157,7 +158,8 @@ console.log('Audit regressions passed: drawing room sizes, column rows, rear ent
 m.switchPlan('A',false);m.state.height=3.3;m.state.floor='0';m.build();m.model.updateMatrixWorld(true);
 const FOOT=.3048,INCH=.0254,g=planAGrid;
 assert.equal(m.plan.width,16.74,'Plan A adopts the printed 16.740 m outer width from drawing 218124');
-assert.ok(Math.abs(m.plan.extension-3.7226)<1e-9,'Plan A projection uses the 12′2½″ / 3722.57 mm reading');
+assert.equal(m.plan.extension,4.85,'Plan A full projection is provisionally traced, not confused with a partial dimension');
+assert.ok(m.plan.stair.dimensionalStatus.includes('provisional'),'photo estimates are explicitly labelled');
 // The old figure may survive in the conflict prose that explains the correction,
 // but must not remain as a dimension anywhere.
 assert.ok(!JSON.stringify({extension:m.plan.extension,readings:m.plan.readings,rooms:m.plan.rooms}).includes('3.773'),'the transposed 3.773 m reading is gone from every Plan A dimension');
@@ -188,7 +190,7 @@ for(const plan of ['A','B']){m.switchPlan(plan,false);const svg=m.svgPlan();
   assert.ok(Number(y)>=vy-1e-6&&Number(y)+Number(h)<=vy+vh+1e-6,plan+' sheet rect stays on the sheet (y='+y+' h='+h+')');
  for(const [,y] of svg.matchAll(/<text[^>]*\by="([-\d.]+)"/g))
   assert.ok(Number(y)>=vy&&Number(y)<=vy+vh,plan+' sheet text stays on the sheet (y='+y+')');
- for(const note of planSheetNotes(m.plan,m.stairMetrics(m.plan.stair.depth,3.3)))
+ for(const note of planSheetNotes(m.plan,frontStairLayout(m.plan,3.3)))
   assert.ok(svg.includes(note.slice(2,40)),plan+' conflict footnote is actually drawn');
 }
 // Dimensions are a single annotation layer rather than one copy per storey.
@@ -216,25 +218,24 @@ assert.ok(m.plan.notes.some(n=>n.includes('WC lobby')),'the lobby inference is d
 m.switchPlan('A',false);
 for(const h of [2.8,3.3,4.5]){m.state.height=h;m.build();const review=m.stairReview().front;
  assert.ok(review.rise<=.19+1e-9,'Plan A riser stays within 190 mm at '+h+' m');
- assert.ok(review.shortfall>0,'Plan A reports the well-depth shortfall it cannot fix');
- assert.ok(review.verdict.includes('diagrammatic'),'Plan A stair is declared diagrammatic');
+ assert.ok(review.shortfall>=0,'going shortfall is non-negative');
+ assert.ok(review.verdict.includes('unverified'),'no verified architectural dimensions are claimed');
 }
 m.state.height=3.3;m.switchPlan('B',false);
 assert.ok(m.stairReview().front.shortfall<.05,'Plan B stair is close to the going target');
-assert.ok(m.stairReview().front.verdict.includes('marginal'),'Plan B stair reported as marginal, not compliant');
+assert.ok(m.stairReview().front.verdict.includes('unverified'),'Plan B section remains unverified');
 // The tread tint, the readout and the exported verdict must agree on one word.
 for(const id of ['A','B']){m.switchPlan(id,false);m.state.height=3.3;m.build();
  const review=m.stairReview().front,band=goingBand(review.tread);
  assert.equal(review.band,band,id+' band is derived from the shared going test');
  assert.ok(review.verdict.startsWith(band==='meets'?'meets':band),id+' verdict uses the band vocabulary');
  const flight=m.floors[0].getObjectByName('Front stair lower flight');
- assert.equal(flight.material.userData.base.getHexString(),band==='meets'?'c7b89f':'d9a961',id+' tread tint matches the band');
+ assert.equal(flight.material.userData.base.getHexString(),goingBand(review.flights[0].going)==='meets'?'c7b89f':'d9a961',id+' each flight tint follows its own going');
  const sheet=m.svgPlan();
  assert.ok(sheet.includes(band==='meets'?'#d9ddcf':'#efdcc0'),id+' sheet tint matches the band');
- // The landing depth is shared, so the sheet's first tread must sit on it.
- const treads=[...sheet.matchAll(/M([\d.]+) ([\d.]+)h([\d.]+)" fill="none" stroke="#71836b"/g)];
- assert.equal(treads.length,review.risers/2,id+' sheet draws one tread per riser in a flight');
- assert.ok(Math.abs(Number(treads[0][2])-(m.plan.stair.z+LANDING))<1e-6,id+' first tread starts at the shared landing depth');
+ // The exported plan has all three flight groups and both quarter-turn landings.
+ assert.equal((sheet.match(/data-front-flight=/g)||[]).length,3,id+' SVG has three flights');
+ assert.equal((sheet.match(/data-front-landing=/g)||[]).length,2,id+' SVG has two landings');
 }
 // Guard: the renderer must stay plan-agnostic, so a further alternative is a
 // data entry in plans.js rather than a second code path. Two hand-written
@@ -285,22 +286,61 @@ for(const id of ['A','B']){m.switchPlan(id,false);m.state.height=3.3;m.build();
 // storeys, while still refusing to let you float over the upper void.
 for(const id of ['A','B']){
  m.switchPlan(id,false);Object.assign(m.state,{mode:'walk',floor:'0',height:3.3,furniture:true});m.build();m.update();
- const st=m.plan.stair,h=3.3,run=st.depth-.88,lowX=st.x+st.width*.25,highX=st.x+st.width*.75;
- assert.ok(Math.abs(m.stairSurface(lowX,st.z+st.depth))<1e-9,id+' flight starts at the lower floor');
- assert.ok(Math.abs(m.stairSurface(lowX,st.z+.88)-h/2)<1e-9,id+' flight reaches the mid landing');
- assert.ok(Math.abs(m.stairSurface(highX,st.z+.88)-h/2)<1e-9,id+' landing is continuous with the upper flight');
- assert.ok(Math.abs(m.stairSurface(highX,st.z+st.depth)-h)<1e-9,id+' upper flight arrives at the first floor');
- assert.equal(m.stairSurface(m.rooms.hall.x,m.rooms.hall.z),null,id+' the hall is not a flight');
- let previous=0;
- for(let t=0;t<=1.0001;t+=.02){const surface=m.stairSurface(lowX,st.z+st.depth-t*run);assert.ok(Math.abs(surface-previous)<=h/2*.03+1e-9,id+' the climb has no jump');previous=surface}
- assert.ok(m.canWalk(lowX,st.z+st.depth-.1,0),id+' the foot of the stair is reachable from the ground');
- assert.ok(!m.canWalk(lowX,st.z+1.2,0),id+' mid-flight is not reachable from the ground floor');
- assert.ok(m.canWalk(lowX,st.z+1.2,m.stairSurface(lowX,st.z+1.2)),id+' mid-flight is walkable at its own elevation');
- assert.ok(!m.canWalk(m.rooms.hall.x,m.rooms.hall.z,h/2),id+' cannot step off a flight part-way up');
- assert.ok(m.canWalk(highX,st.z+st.depth-.1,h),id+' the top of the stair is reachable at first-floor level');
- assert.ok(!m.canWalk(lowX,st.z+1.2,h),id+' the upper void still blocks walking');
+ const st=frontStairLayout(m.plan,3.3),h=3.3;
+ assert.deepEqual(st.flights.map(f=>[f.axis,Math.sign(f.end-f.start)]),[['x',-1],['z',-1],['x',1]],id+' photograph orientation: bottom left, left up, top right');
+ for(const f of st.flights){
+  const point=t=>({x:f.axis==='x'?f.start+(f.end-f.start)*t:f.c,z:f.axis==='z'?f.start+(f.end-f.start)*t:f.c});
+  for(let i=0;i<=50;i++){const t=i/50,p=point(t),y=f.y0+(f.y1-f.y0)*t;
+   assert.ok(Math.abs(m.stairSurface(p.x,p.z)-y)<1e-8,id+' flight '+f.id+' continuous height');
+   assert.ok(m.canWalk(p.x,p.z,y),id+' flight '+f.id+' walkable at its elevation');
+  }
+  const mid=point(.5);assert.ok(!m.canWalk(mid.x,mid.z,f.y1+1),id+' no jumping to another flight elevation');
+ }
+ const lower=st.flights[0],upper=st.flights[2];
+ assert.ok(m.canWalk(lower.start+.2,lower.c,0),id+' ground entrance on the right of lower flight');
+ assert.ok(m.canWalk(upper.end+.2,upper.c,h),id+' upper exit on the right of upper flight');
+ const gap={x:st.x+st.flightWidth+.2,z:st.z+st.depth/2};
+ assert.equal(m.stairSurface(gap.x,gap.z),null,id+' the central well is not a fictitious flight');
+ assert.ok(!m.canWalk(gap.x,gap.z,h),id+' central upper void blocks walking');
+ assert.ok(!m.canWalk(m.rooms.hall.x,m.rooms.hall.z,h/2),id+' cannot step off mid-flight');
  for(const floor of m.floors)assert.equal(floor.visible,true,id+' both storeys stay visible while walking between them');
 }
+// Check actual meshes and slab openings, not only the layout helper.
+for(const id of ['A','B']){
+ m.switchPlan(id,false);Object.assign(m.state,{mode:'exterior',floor:'both',height:3.3});m.build();m.update();m.model.updateMatrixWorld(true);
+ const st=frontStairLayout(m.plan,3.3),slab=m.floors[1].getObjectByName('Floor slab');
+ for(const f of st.flights){
+  const treads=[];m.floors[0].traverse(o=>{if(o.userData.frontFlight===f.id)treads.push(o)});
+  assert.equal(treads.length,f.count,id+' flight '+f.id+' actual mesh count');
+  for(let i=0;i<treads.length;i++){
+   const b=new THREE.Box3().setFromObject(treads[i]),center=b.getCenter(new THREE.Vector3()),expected=f.y0+(i+1)*st.rise;
+   assert.ok(Math.abs(b.max.y-expected)<1e-6,id+' actual tread elevation');
+   const p=f.start+Math.sign(f.end-f.start)*(i+.5)*f.going;
+   assert.ok(Math.abs((f.axis==='x'?center.x:center.z)-p)<1e-6,id+' actual tread follows photograph direction');
+   ray.set(new THREE.Vector3(center.x,3.6,center.z),new THREE.Vector3(0,-1,0));
+   assert.equal(ray.intersectObject(slab).length,0,id+' no slab across flight '+f.id);
+  }
+ }
+ for(const l of st.landings){const mesh=m.floors[0].getObjectByName('Front stair landing '+l.id),b=new THREE.Box3().setFromObject(mesh);
+  assert.ok(Math.abs(b.max.y-l.y)<1e-6,id+' physical landing meets flights');
+  const x=l.x+l.width/2,z=l.z+l.depth/2;assert.ok(m.canWalk(x,z,l.y),id+' can turn on landing '+l.id);
+  ray.set(new THREE.Vector3(x,3.6,z),new THREE.Vector3(0,-1,0));assert.equal(ray.intersectObject(slab).length,0,id+' landing has headroom through first-floor opening');
+ }
+ ray.set(new THREE.Vector3(st.exit.x+.3,3.6,st.exit.z),new THREE.Vector3(0,-1,0));
+ assert.ok(ray.intersectObject(slab).length,id+' actual slab supports the upper arrival');
+ assert.ok(!st.guards.some(([x1,z1,x2,z2])=>x1===st.exit.x&&x2===st.exit.x&&st.exit.z>=Math.min(z1,z2)&&st.exit.z<=Math.max(z1,z2)),id+' guard does not block the upper arrival');
+ const sheet=m.svgPlan();assert.equal((sheet.match(/data-front-flight=/g)||[]).length,3);
+}
+m.switchPlan('B',false);
+const bSt=m.plan.stair;
+assert.ok(Math.abs(m.plan.width-m.plan.wallThickness/2-bSt.x-bSt.width-4.365)<1e-9,'printed 4365 mm clear span');
+const hallOpening=m.openingsDrawn.find(o=>o.floor===1&&o.door&&Math.abs(o.c-m.plan.depth)<1e-6);
+assert.ok(Math.abs(hallOpening.b-hallOpening.a-1.825)<1e-9,'printed 1825 mm hall opening');
+assert.ok(Math.abs(m.plan.width-m.plan.wallThickness/2-hallOpening.b-2.540)<1e-9,'printed 2540 mm right return');
+const entrance=m.openingsDrawn.find(o=>o.floor===0&&o.door&&Math.abs(o.c-m.plan.depth-m.plan.extension)<1e-6);
+assert.ok(Math.abs(entrance.b-entrance.a-1.8)<1e-9,'printed 1800 mm entrance');
+assert.equal(m.plan.extension,4.6,'printed 4600 mm projection retained');
+console.log('Three-flight checks passed: mesh direction/elevation, two landings, slab voids, supported upper exits, walking on every flight, central-void blocking and printed Plan B dimension chain.');
 m.switchPlan('A',false);Object.assign(m.state,{mode:'exterior',floor:'both',height:3.3});m.update();
 // Camera fitting replaces hand-placed positions that left a portrait viewport
 // with the model about a quarter too small.
